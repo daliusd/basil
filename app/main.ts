@@ -1,16 +1,19 @@
-import { generatePdf } from '../lib/pdfgen';
 import * as fs from 'fs';
 
-const data = {
+import { JobData, generatePdf } from '../lib/pdfgen';
+
+const data: JobData = {
+    width: 63.5,
+    height: 88.9,
     cardsAllIds: ['YKEWya2ef', 'e5wV1082R'],
     cardsById: {
         YKEWya2ef: {
             id: 'YKEWya2ef',
-            count: 1,
+            count: 5,
         },
         e5wV1082R: {
             id: 'e5wV1082R',
-            count: 2,
+            count: 5,
         },
     },
     placeholders: {
@@ -64,8 +67,8 @@ const data = {
     },
     pageWidth: 210,
     pageHeight: 297,
-    topBottomMargin: 20,
-    leftRightMargin: 20,
+    topBottomMargin: 15,
+    leftRightMargin: 9,
 };
 
 const stream = fs.createWriteStream('output.pdf');
