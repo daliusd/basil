@@ -2,9 +2,10 @@ const PDFDocument: PDFKit.PDFDocument = require('pdfkit');
 const buffer = require('buffer');
 const SVGtoPDF = require('svg-to-pdfkit');
 const axios = require('axios');
+const webFonts = require('./webfonts').webFonts;
 
 // Types
-// XXX: Careful code duplication here. If you change types in saffron changes types here as well
+// XXX: Careful! Code duplication here. If you change types in saffron changes types here as well
 
 export interface CardType {
     id: string;
@@ -128,6 +129,7 @@ export const generatePdf = async (
         let cardX = data.leftRightMargin * PTPMM;
         let cardY = data.topBottomMargin * PTPMM;
         let addNewPage = false;
+        let registeredFonts = new Set();
 
         for (const cardId of data.cardsAllIds) {
             const cardInfo = data.cardsById[cardId];
@@ -185,11 +187,28 @@ export const generatePdf = async (
                     );
                     doc.rotate((placeholder.angle * 180) / Math.PI);
                     doc.translate((-placeholder.width / 2) * PTPMM, (-placeholder.height / 2) * PTPMM);
-                    doc.fontSize(placeholder.fontSize * PTPMM).text(textInfo.value, 0, 0, {
-                        align: placeholder.align,
-                        width: placeholder.width * PTPMM,
-                        height: placeholder.height * PTPMM,
-                    });
+
+                    const fontName = `${placeholder.fontFamily}:${placeholder.fontVariant}`;
+                    if (
+                        !registeredFonts.has(fontName) &&
+                        placeholder.fontFamily in webFonts &&
+                        placeholder.fontVariant in webFonts[placeholder.fontFamily]
+                    ) {
+                        const fontUrl = webFonts[placeholder.fontFamily][placeholder.fontVariant];
+                        var arrayBuffer = await makeRequest(fontUrl);
+                        const buf = buffer.Buffer.from(arrayBuffer.data);
+
+                        doc.registerFont(fontName, buf);
+                        registeredFonts.add(fontName);
+                    }
+
+                    doc.font(fontName)
+                        .fontSize(placeholder.fontSize * PTPMM)
+                        .text(textInfo.value, 0, 0, {
+                            align: placeholder.align,
+                            width: placeholder.width * PTPMM,
+                            height: placeholder.height * PTPMM,
+                        });
                     doc.restore();
                 }
 
