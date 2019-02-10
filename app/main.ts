@@ -2,74 +2,70 @@ import { generatePdf } from '../lib/pdfgen';
 import * as fs from 'fs';
 
 const data = {
-    isAuthenticated: true,
-    cardsAllIds: ['TGFr1t-ZU', 'gM2yskI9K'],
+    cardsAllIds: ['YKEWya2ef', 'e5wV1082R'],
     cardsById: {
-        'TGFr1t-ZU': { id: 'TGFr1t-ZU', count: 2 },
-        gM2yskI9K: { id: 'gM2yskI9K', count: 1 },
+        YKEWya2ef: {
+            id: 'YKEWya2ef',
+            count: 1,
+        },
+        e5wV1082R: {
+            id: 'e5wV1082R',
+            count: 2,
+        },
     },
     placeholders: {
-        rHed2Qgja: {
-            id: 'rHed2Qgja',
-            type: 'text',
-            x: 31,
-            y: 221,
-            width: 138,
-            height: 52,
+        o0Kh4zsgz: {
+            id: 'o0Kh4zsgz',
+            type: 'image',
+            x: 23.283333333333335,
+            y: 48.41875,
+            width: 37.041666666666664,
+            height: 35.71875,
             angle: 0,
-            align: 'right',
+        },
+        dpBZ7ZVEs: {
+            id: 'dpBZ7ZVEs',
+            type: 'text',
+            x: 2.910416666666667,
+            y: 6.879166666666666,
+            width: 56.62083333333334,
+            height: 13.229166666666666,
+            angle: -0.13017305440325466,
+            align: 'center',
             color: '#000000',
-            fontFamily: 'Ribeye',
+            fontFamily: 'Mountains of Christmas',
             fontVariant: 'regular',
-            fontSize: '28',
-        },
-        VhZw0FW1o: {
-            id: 'VhZw0FW1o',
-            type: 'image',
-            x: 32,
-            y: 22,
-            width: 96,
-            height: 111,
-            angle: -0.04726816357087049,
-        },
-        xbhCNDeXc: {
-            id: 'xbhCNDeXc',
-            type: 'text',
-            x: 31,
-            y: 176,
-            width: 103,
-            height: 55,
-            angle: -0.436705245370808,
-            align: 'left',
-            color: '#d022bb',
-            fontFamily: 'Princess Sofia',
-            fontVariant: 'regular',
-            fontSize: '32',
-        },
-        DgZoUIhA3e: {
-            id: 'DgZoUIhA3e',
-            type: 'image',
-            x: 22,
-            y: 108,
-            width: 50,
-            height: 50,
-            angle: 0,
+            fontSize: 8,
         },
     },
     texts: {
-        'TGFr1t-ZU': {
-            rHed2Qgja: { value: 'Niced' },
-            xbhCNDeXc: { value: 'Priest' },
+        YKEWya2ef: {
+            dpBZ7ZVEs: {
+                value: 'RIVER',
+            },
         },
-        gM2yskI9K: {
-            rHed2Qgja: { value: 'Hello' },
-            xbhCNDeXc: { value: 'Lov<font color="#ea2c6e">er</font><br>' },
+        e5wV1082R: {
+            dpBZ7ZVEs: {
+                value: 'MOUNTAIN',
+            },
         },
     },
     images: {
-        'TGFr1t-ZU': { VhZw0FW1o: { url: '/api/imagefiles/lorc monkey' } },
-        gM2yskI9K: { VhZw0FW1o: { url: '/api/imagefiles/faithtoken dragon-head' } },
+        YKEWya2ef: {
+            o0Kh4zsgz: {
+                url: '/api/imagefiles/delapouite river',
+            },
+        },
+        e5wV1082R: {
+            o0Kh4zsgz: {
+                url: '/api/imagefiles/delapouite mountain-cave',
+            },
+        },
     },
+    pageWidth: 210,
+    pageHeight: 297,
+    topBottomMargin: 20,
+    leftRightMargin: 20,
 };
 
 const stream = fs.createWriteStream('output.pdf');

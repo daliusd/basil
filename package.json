@@ -5,7 +5,7 @@
     "main": "index.js",
     "scripts": {
         "start": "cd app && npx ts-node main.ts && xdg-open output.pdf",
-        "build": "cd worker && node index.js > ../../saffron/public/js/worker",
+        "build": "cd worker && node index.js > ../../saffron/public/js/worker.js",
         "test": "echo \"Error: no test specified\" && exit 1"
     },
     "author": "",
