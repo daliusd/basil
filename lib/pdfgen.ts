@@ -3,6 +3,7 @@ const buffer = require('buffer');
 const SVGtoPDF = require('svg-to-pdfkit');
 const axios = require('axios');
 const webFonts = require('./webfonts').webFonts;
+import { XmlDocument, XmlNode, XmlTextNode, XmlElement } from 'xmldoc';
 
 // Types
 // XXX: Careful! Code duplication here. If you change types in saffron changes types here as well
@@ -95,6 +96,41 @@ const makeRequest = async (url: string) => {
     });
 };
 
+const drawText = (node: XmlNode, doc: PDFKit.PDFDocument, textOptions: any) => {
+    let text = '';
+    if (node.type !== 'element') {
+        return '';
+    }
+
+    for (const child of node.children) {
+        if (child.type === 'text') {
+            if (textOptions.align === 'left') {
+                doc.text(child.text, { continued: true });
+            } else {
+                text += child.text;
+            }
+        } else if (child.type === 'element') {
+            doc.save();
+            if (textOptions.align === 'left' && child.name === 'font' && 'color' in child.attr) {
+                doc.fillColor(child.attr['color']);
+            }
+            text += drawText(child, doc, textOptions);
+            if (child.name === 'div') {
+                doc.moveDown(1);
+                doc.text('');
+                doc.text('', textOptions);
+                text = '';
+            }
+            doc.restore();
+        }
+    }
+
+    if (node.name === 'div' && textOptions.align !== 'left') {
+        doc.text(text, { continued: true });
+    }
+    return text;
+};
+
 export const generatePdf = async (
     data: JobData,
     serverUrl: string,
@@ -179,6 +215,8 @@ export const generatePdf = async (
                     if (placeholder.type !== 'text') {
                         throw new Error('Corrupted data passed to PDF Generator.');
                     }
+                    let text = `<div>${textInfo.value.replace(/<br>/g, '<br/>')}</div>`;
+                    let parsedText = new XmlDocument(text);
 
                     doc.save();
                     doc.translate(
@@ -202,13 +240,19 @@ export const generatePdf = async (
                         registeredFonts.add(fontName);
                     }
 
+                    const textOptions = {
+                        align: placeholder.align,
+                        width: placeholder.width * PTPMM,
+                        height: placeholder.height * PTPMM,
+                        continued: true,
+                    };
+                    doc.fillColor(placeholder.color);
                     doc.font(fontName)
                         .fontSize(placeholder.fontSize * PTPMM)
-                        .text(textInfo.value, 0, 0, {
-                            align: placeholder.align,
-                            width: placeholder.width * PTPMM,
-                            height: placeholder.height * PTPMM,
-                        });
+                        .text('', 0, 0, textOptions);
+                    drawText(parsedText, doc, textOptions);
+                    doc.text('');
+
                     doc.restore();
                 }
 
