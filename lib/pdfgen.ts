@@ -201,10 +201,20 @@ export const generatePdf = async (
                     var arrayBuffer = await makeRequest(serverUrl + imageInfo.url);
                     const buf = buffer.Buffer.from(arrayBuffer.data);
 
-                    SVGtoPDF(doc, buf.toString(), cardX + placeholder.x * PTPMM, cardY + placeholder.y * PTPMM, {
+                    doc.save();
+                    doc.translate(
+                        cardX + (placeholder.x + placeholder.width / 2) * PTPMM,
+                        cardY + (placeholder.y + placeholder.height / 2) * PTPMM,
+                    );
+                    doc.rotate((placeholder.angle * 180) / Math.PI);
+                    doc.translate((-placeholder.width / 2) * PTPMM, (-placeholder.height / 2) * PTPMM);
+
+                    SVGtoPDF(doc, buf.toString(), 0, 0, {
                         width: placeholder.width * PTPMM,
                         height: placeholder.height * PTPMM,
                     });
+
+                    doc.restore();
                 }
                 // Generate texts
                 const cardTexts = data.texts[cardId];
