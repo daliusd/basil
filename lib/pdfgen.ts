@@ -242,7 +242,8 @@ export const generatePdf = async (
                         placeholder.fontFamily in webFonts &&
                         placeholder.fontVariant in webFonts[placeholder.fontFamily]
                     ) {
-                        const fontUrl = webFonts[placeholder.fontFamily][placeholder.fontVariant];
+                        let fontUrl = webFonts[placeholder.fontFamily][placeholder.fontVariant];
+                        fontUrl = fontUrl.replace('http://', 'https://');
                         var arrayBuffer = await makeRequest(fontUrl);
                         const buf = buffer.Buffer.from(arrayBuffer.data);
 
