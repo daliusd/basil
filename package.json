@@ -4,7 +4,7 @@
     "description": "",
     "main": "index.js",
     "scripts": {
-        "start": "cd app && npx ts-node main.ts && xdg-open output.pdf",
+        "start": "npx ts-node main.ts",
         "build": "cd worker && node index.js > ../../saffron/public/js/worker.js",
         "test": "echo \"Error: no test specified\" && exit 1"
     },
@@ -25,7 +25,8 @@
         "ts-node": "^8.0.2",
         "tsify": "^4.0.1",
         "uglifyify": "^5.0.1",
-        "xmldoc": "^1.1.2"
+        "xmldoc": "^1.1.2",
+        "yargs": "^13.2.1"
     },
     "devDependencies": {
         "prettier": "^1.16.3"
