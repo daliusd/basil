@@ -3,6 +3,8 @@ const buffer = require('buffer');
 const SVGtoPDF = require('svg-to-pdfkit');
 const axios = require('axios');
 const webFonts = require('./webfonts').webFonts;
+const fontkit = require('fontkit');
+
 import { XmlDocument, XmlNode, XmlTextNode, XmlElement } from 'xmldoc';
 
 // Types
@@ -96,7 +98,21 @@ const makeRequest = async (url: string) => {
     });
 };
 
-const drawText = (node: XmlNode, doc: PDFKit.PDFDocument, textOptions: any) => {
+const stupidText = (doc: PDFKit.PDFDocument, text: string, font: any, fontSize: number) => {
+    doc.save();
+    let run = font.layout(text);
+
+    for (let glyph of run.glyphs) {
+        glyph.render(doc, fontSize);
+
+        let gx = (glyph.advanceWidth / font.head.unitsPerEm) * fontSize;
+        doc.translate(gx, 0);
+        // var scale = 1 / this._font.head.unitsPerEm * size;
+    }
+    doc.restore();
+};
+
+const drawText = (node: XmlNode, doc: PDFKit.PDFDocument, textOptions: any, font: any, fontSize: number) => {
     let text = '';
     if (node.type !== 'element') {
         return '';
@@ -105,7 +121,8 @@ const drawText = (node: XmlNode, doc: PDFKit.PDFDocument, textOptions: any) => {
     for (const child of node.children) {
         if (child.type === 'text') {
             if (textOptions.align === 'left') {
-                doc.text(child.text, { continued: true });
+                // doc.text(child.text, { continued: true });
+                stupidText(doc, text, font, fontSize);
             } else {
                 text += child.text;
             }
@@ -114,7 +131,7 @@ const drawText = (node: XmlNode, doc: PDFKit.PDFDocument, textOptions: any) => {
             if (textOptions.align === 'left' && child.name === 'font' && 'color' in child.attr) {
                 doc.fillColor(child.attr['color']);
             }
-            text += drawText(child, doc, textOptions);
+            text += drawText(child, doc, textOptions, font, fontSize);
             if (child.name === 'div') {
                 doc.moveDown(1);
                 doc.text('');
@@ -126,7 +143,8 @@ const drawText = (node: XmlNode, doc: PDFKit.PDFDocument, textOptions: any) => {
     }
 
     if (node.name === 'div' && textOptions.align !== 'left') {
-        doc.text(text, { continued: true });
+        stupidText(doc, text, font, fontSize);
+        // doc.text(text, { continued: true });
     }
     return text;
 };
@@ -165,7 +183,7 @@ export const generatePdf = async (
         let cardX = data.leftRightMargin * PTPMM;
         let cardY = data.topBottomMargin * PTPMM;
         let addNewPage = false;
-        let registeredFonts = new Set();
+        let registeredFonts = {};
 
         for (const cardId of data.cardsAllIds) {
             const cardInfo = data.cardsById[cardId];
@@ -238,7 +256,7 @@ export const generatePdf = async (
 
                     const fontName = `${placeholder.fontFamily}:${placeholder.fontVariant}`;
                     if (
-                        !registeredFonts.has(fontName) &&
+                        !(fontName in registeredFonts) &&
                         placeholder.fontFamily in webFonts &&
                         placeholder.fontVariant in webFonts[placeholder.fontFamily]
                     ) {
@@ -247,9 +265,13 @@ export const generatePdf = async (
                         var arrayBuffer = await makeRequest(fontUrl);
                         const buf = buffer.Buffer.from(arrayBuffer.data);
 
-                        doc.registerFont(fontName, buf);
-                        registeredFonts.add(fontName);
+                        // doc.registerFont(fontName, buf);
+
+                        let font = fontkit.create(buf);
+                        registeredFonts[fontName] = font;
                     }
+
+                    let font = registeredFonts[fontName];
 
                     const textOptions = {
                         align: placeholder.align,
@@ -258,11 +280,11 @@ export const generatePdf = async (
                         continued: true,
                     };
                     doc.fillColor(placeholder.color);
-                    doc.font(fontName)
-                        .fontSize(placeholder.fontSize * PTPMM)
-                        .text('', 0, 0, textOptions);
-                    drawText(parsedText, doc, textOptions);
-                    doc.text('');
+                    //doc.font(fontName)
+                    //    .fontSize(placeholder.fontSize * PTPMM)
+                    //    .text('', 0, 0, textOptions);
+                    drawText(parsedText, doc, textOptions, font, placeholder.fontSize * PTPMM);
+                    //doc.text('');
 
                     doc.restore();
                 }
