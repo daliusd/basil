@@ -4,6 +4,7 @@ const SVGtoPDF = require('svg-to-pdfkit');
 const axios = require('axios');
 const webFonts = require('./webfonts').webFonts;
 const fontkit = require('fontkit');
+const { SVGPathData } = require('svg-pathdata');
 
 import { XmlDocument, XmlNode, XmlTextNode, XmlElement } from 'xmldoc';
 
@@ -98,12 +99,30 @@ const makeRequest = async (url: string) => {
     });
 };
 
+function flip(svgPath: string) {
+    const pathData = new SVGPathData(svgPath);
+    const flipped = pathData.matrix(1, 0, 0, -1, 0, 0).encode();
+
+    return flipped;
+}
+
 const stupidText = (doc: PDFKit.PDFDocument, text: string, font: any, fontSize: number) => {
     doc.save();
     let run = font.layout(text);
 
+    doc.translate(0, (font.hhea.ascent / font.head.unitsPerEm) * fontSize);
+
     for (let glyph of run.glyphs) {
-        glyph.render(doc, fontSize);
+        const flipped = flip(glyph.path.toSVG());
+
+        doc.save();
+
+        let scale = (1 / font.head.unitsPerEm) * fontSize;
+        doc.scale(scale, scale);
+
+        doc.path(flipped).fill();
+
+        doc.restore();
 
         let gx = (glyph.advanceWidth / font.head.unitsPerEm) * fontSize;
         doc.translate(gx, 0);
