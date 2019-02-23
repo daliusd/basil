@@ -174,16 +174,15 @@ function drawTextSlices(doc: PDFKit.PDFDocument, textSlices: TextSlice[], textOp
 
         lineWidth += advanceWidth;
         if (lineWidth > textOptions.width) {
-            let remainingLine: TextLineGlyph[] = [];
+            let partToDraw: TextLineGlyph[] = [];
             if (lastSpace !== -1) {
-                remainingLine = lineToDraw.splice(0, lastSpace);
+                partToDraw = lineToDraw.splice(0, lastSpace);
+                lineToDraw = lineToDraw.slice(1); // Remove space for remaining part
+            } else {
+                partToDraw = lineToDraw.splice(0, lineToDraw.length - 1);
             }
 
-            drawTextLine(doc, lineToDraw, textOptions);
-            lineToDraw = remainingLine;
-            if (lineToDraw.length > 0) {
-                lineToDraw = lineToDraw.slice(1);
-            }
+            drawTextLine(doc, partToDraw, textOptions);
             lineWidth = lineToDraw.map(l => l.advanceWidth).reduce((a, b) => a + b, 0);
             lastSpace = -1;
 
