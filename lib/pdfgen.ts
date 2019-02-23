@@ -186,7 +186,7 @@ function drawTextSlices(doc: PDFKit.PDFDocument, textSlices: TextSlice[], textOp
             lineWidth = lineToDraw.map(l => l.advanceWidth).reduce((a, b) => a + b, 0);
             lastSpace = -1;
 
-            doc.translate(0, textOptions.fontSize); // Move cursor one text line down
+            doc.translate(0, textOptions.fontSize * 1.27); // Move cursor one text line down
         }
 
         charNo++;
@@ -197,7 +197,7 @@ function drawTextSlices(doc: PDFKit.PDFDocument, textSlices: TextSlice[], textOp
     }
     if (lineToDraw.length > 0) {
         drawTextLine(doc, lineToDraw, textOptions);
-        doc.translate(0, textOptions.fontSize); // Move cursor one text line down
+        doc.translate(0, textOptions.fontSize * 1.27); // Move cursor one text line down
     }
 }
 
