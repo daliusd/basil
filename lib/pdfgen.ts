@@ -99,6 +99,28 @@ const makeRequest = async (url: string) => {
     });
 };
 
+// Text drawing
+interface TextSlice {
+    text: string;
+    color: string;
+}
+
+interface TextOptions {
+    font: any;
+    fontSize: number;
+    align: string;
+    width: number;
+    height: number;
+    ascent: number;
+    scale: number;
+}
+
+interface TextLineGlyph {
+    glyph: any;
+    color: string;
+    advanceWidth: number;
+}
+
 function flip(svgPath: string) {
     const pathData = new SVGPathData(svgPath);
     const flipped = pathData.matrix(1, 0, 0, -1, 0, 0).encode();
@@ -106,67 +128,106 @@ function flip(svgPath: string) {
     return flipped;
 }
 
-const stupidText = (doc: PDFKit.PDFDocument, text: string, font: any, fontSize: number) => {
+function drawTextLine(doc: PDFKit.PDFDocument, textLine: TextLineGlyph[], textOptions: TextOptions) {
+    const lineWidth = textLine.map(l => l.advanceWidth).reduce((a, b) => a + b, 0);
+
     doc.save();
-    let run = font.layout(text);
+    doc.translate(0, textOptions.ascent);
 
-    doc.translate(0, (font.hhea.ascent / font.head.unitsPerEm) * fontSize);
+    if (textOptions.align === 'center') {
+        doc.translate((textOptions.width - lineWidth) / 2, 0);
+    } else if (textOptions.align === 'right') {
+        doc.translate(textOptions.width - lineWidth, 0);
+    }
 
-    for (let glyph of run.glyphs) {
-        const flipped = flip(glyph.path.toSVG());
+    for (const tlg of textLine) {
+        doc.fillColor(tlg.color);
 
         doc.save();
-
-        let scale = (1 / font.head.unitsPerEm) * fontSize;
-        doc.scale(scale, scale);
-
+        doc.scale(textOptions.scale, textOptions.scale);
+        const flipped = flip(tlg.glyph.path.toSVG());
         doc.path(flipped).fill();
-
         doc.restore();
 
-        let gx = (glyph.advanceWidth / font.head.unitsPerEm) * fontSize;
-        doc.translate(gx, 0);
-        // var scale = 1 / this._font.head.unitsPerEm * size;
+        doc.translate(tlg.advanceWidth, 0);
     }
-    doc.restore();
-};
 
-const drawText = (node: XmlNode, doc: PDFKit.PDFDocument, textOptions: any, font: any, fontSize: number) => {
-    let text = '';
+    doc.restore();
+}
+
+function drawTextSlices(doc: PDFKit.PDFDocument, textSlices: TextSlice[], textOptions: TextOptions) {
+    const joinedText = textSlices.map(ts => ts.text).join('');
+    let run = textOptions.font.layout(joinedText);
+
+    let lineToDraw: TextLineGlyph[] = [];
+    let lineWidth = 0;
+    let sliceNo = 0;
+    let charNo = 0;
+    let lastSpace = -1;
+    for (let glyph of run.glyphs) {
+        let advanceWidth = (glyph.advanceWidth / textOptions.font.head.unitsPerEm) * textOptions.fontSize;
+
+        lineToDraw.push({ glyph, color: textSlices[sliceNo].color, advanceWidth });
+        if (lineToDraw.length > 1 && textSlices[sliceNo][charNo] === ' ') {
+            lastSpace = lineToDraw.length - 1;
+        }
+
+        lineWidth += advanceWidth;
+        if (lineWidth > textOptions.width) {
+            let remainingLine: TextLineGlyph[] = [];
+            if (lastSpace !== -1) {
+                remainingLine = lineToDraw.splice(0, lastSpace);
+            }
+
+            drawTextLine(doc, lineToDraw, textOptions);
+            lineToDraw = remainingLine;
+            if (lineToDraw.length > 0) {
+                lineToDraw = lineToDraw.slice(1);
+            }
+            lineWidth = lineToDraw.map(l => l.advanceWidth).reduce((a, b) => a + b, 0);
+            lastSpace = -1;
+
+            doc.translate(0, textOptions.fontSize); // Move cursor one text line down
+        }
+
+        charNo++;
+        if (charNo >= textSlices[sliceNo].text.length) {
+            charNo = 0;
+            sliceNo++;
+        }
+    }
+    if (lineToDraw.length > 0) {
+        drawTextLine(doc, lineToDraw, textOptions);
+        doc.translate(0, textOptions.fontSize); // Move cursor one text line down
+    }
+}
+
+function drawText(node: XmlNode, doc: PDFKit.PDFDocument, color: string, textOptions: TextOptions): TextSlice[] {
+    let textSlices = [];
     if (node.type !== 'element') {
-        return '';
+        return [];
     }
 
     for (const child of node.children) {
         if (child.type === 'text') {
-            if (textOptions.align === 'left') {
-                // doc.text(child.text, { continued: true });
-                stupidText(doc, text, font, fontSize);
-            } else {
-                text += child.text;
-            }
+            textSlices.push({ text: child.text, color });
         } else if (child.type === 'element') {
-            doc.save();
-            if (textOptions.align === 'left' && child.name === 'font' && 'color' in child.attr) {
-                doc.fillColor(child.attr['color']);
+            let newColor = color;
+            if (child.name === 'font' && 'color' in child.attr) {
+                newColor = child.attr['color'];
             }
-            text += drawText(child, doc, textOptions, font, fontSize);
-            if (child.name === 'div') {
-                doc.moveDown(1);
-                doc.text('');
-                doc.text('', textOptions);
-                text = '';
-            }
-            doc.restore();
+            textSlices = [...textSlices, ...drawText(child, doc, newColor, textOptions)];
         }
     }
 
-    if (node.name === 'div' && textOptions.align !== 'left') {
-        stupidText(doc, text, font, fontSize);
-        // doc.text(text, { continued: true });
+    if (node.name === 'div') {
+        drawTextSlices(doc, textSlices, textOptions);
+        return [];
     }
-    return text;
-};
+    return textSlices;
+}
+
+// PDF generation
 
 export const generatePdf = async (
     data: JobData,
@@ -202,7 +263,7 @@ export const generatePdf = async (
         let cardX = data.leftRightMargin * PTPMM;
         let cardY = data.topBottomMargin * PTPMM;
         let addNewPage = false;
-        let registeredFonts = {};
+        let knownFonts = {};
 
         for (const cardId of data.cardsAllIds) {
             const cardInfo = data.cardsById[cardId];
@@ -275,7 +336,7 @@ export const generatePdf = async (
 
                     const fontName = `${placeholder.fontFamily}:${placeholder.fontVariant}`;
                     if (
-                        !(fontName in registeredFonts) &&
+                        !(fontName in knownFonts) &&
                         placeholder.fontFamily in webFonts &&
                         placeholder.fontVariant in webFonts[placeholder.fontFamily]
                     ) {
@@ -284,26 +345,23 @@ export const generatePdf = async (
                         var arrayBuffer = await makeRequest(fontUrl);
                         const buf = buffer.Buffer.from(arrayBuffer.data);
 
-                        // doc.registerFont(fontName, buf);
-
                         let font = fontkit.create(buf);
-                        registeredFonts[fontName] = font;
+                        knownFonts[fontName] = font;
                     }
 
-                    let font = registeredFonts[fontName];
+                    let font = knownFonts[fontName];
 
-                    const textOptions = {
+                    let fontSize = placeholder.fontSize * PTPMM;
+                    const textOptions: TextOptions = {
+                        font,
+                        fontSize,
                         align: placeholder.align,
                         width: placeholder.width * PTPMM,
                         height: placeholder.height * PTPMM,
-                        continued: true,
+                        ascent: (font.hhea.ascent / font.head.unitsPerEm) * fontSize,
+                        scale: (1.0 / font.head.unitsPerEm) * fontSize,
                     };
-                    doc.fillColor(placeholder.color);
-                    //doc.font(fontName)
-                    //    .fontSize(placeholder.fontSize * PTPMM)
-                    //    .text('', 0, 0, textOptions);
-                    drawText(parsedText, doc, textOptions, font, placeholder.fontSize * PTPMM);
-                    //doc.text('');
+                    drawText(parsedText, doc, placeholder.color, textOptions);
 
                     doc.restore();
                 }
