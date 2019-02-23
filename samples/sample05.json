@@ -1,0 +1,186 @@
+{
+    "width": 63.5,
+    "height": 88.9,
+    "cardsAllIds": ["vbTBrDA66", "rgrMcY17I", "rWGBmuPMA", "e_m8YMQb3", "rMN1Gti45", "q7GtQTKHe"],
+    "cardsById": {
+        "vbTBrDA66": {
+            "id": "vbTBrDA66",
+            "count": 1
+        },
+        "rgrMcY17I": {
+            "id": "rgrMcY17I",
+            "count": 1
+        },
+        "rWGBmuPMA": {
+            "id": "rWGBmuPMA",
+            "count": 1
+        },
+        "e_m8YMQb3": {
+            "id": "e_m8YMQb3",
+            "count": 1
+        },
+        "rMN1Gti45": {
+            "id": "rMN1Gti45",
+            "count": 1
+        },
+        "q7GtQTKHe": {
+            "id": "q7GtQTKHe",
+            "count": 1
+        }
+    },
+    "placeholders": {
+        "AIqt0k4-L": {
+            "id": "AIqt0k4-L",
+            "type": "image",
+            "x": 19.314583333333335,
+            "y": 112.97708333333334,
+            "width": 30.95625,
+            "height": 33.072916666666664,
+            "angle": 0.002010814430526864
+        },
+        "xLwjoZmmH": {
+            "id": "xLwjoZmmH",
+            "type": "text",
+            "x": 1.0583333333333333,
+            "y": 76.46458333333334,
+            "width": 29.633333333333333,
+            "height": 10.31875,
+            "angle": 0,
+            "align": "center",
+            "color": "#3d27ad",
+            "fontFamily": "Ribeye",
+            "fontVariant": "regular",
+            "fontSize": 8
+        },
+        "jR51lvPy7": {
+            "id": "jR51lvPy7",
+            "type": "text",
+            "x": 9.525,
+            "y": 2.6458333333333335,
+            "width": 38.1,
+            "height": 60.854166666666664,
+            "angle": -0.21322590963512633,
+            "align": "center",
+            "color": "#3d27ad",
+            "fontFamily": "Lobster Two",
+            "fontVariant": "regular",
+            "fontSize": 10
+        },
+        "9Q6WnTaVq": {
+            "id": "9Q6WnTaVq",
+            "type": "image",
+            "x": 4.7625,
+            "y": 53.18125,
+            "width": 20,
+            "height": 20,
+            "angle": 0
+        },
+        "CEF7SL8pZ": {
+            "id": "CEF7SL8pZ",
+            "type": "text",
+            "x": 41.275,
+            "y": 9.260416666666666,
+            "width": 20,
+            "height": 10,
+            "angle": 0,
+            "align": "right",
+            "color": "#f31c42",
+            "fontFamily": "Roboto",
+            "fontVariant": "regular",
+            "fontSize": 8
+        }
+    },
+    "texts": {
+        "vbTBrDA66": {
+            "xLwjoZmmH": {
+                "value": "test"
+            },
+            "jR51lvPy7": {
+                "value": "<div>test</div><div>ok</div><div>lsd</div>"
+            },
+            "CEF7SL8pZ": {
+                "value": "red"
+            }
+        },
+        "rgrMcY17I": {
+            "xLwjoZmmH": {
+                "value": "asd"
+            },
+            "jR51lvPy7": {
+                "value": "Testas"
+            }
+        },
+        "e_m8YMQb3": {
+            "xLwjoZmmH": {
+                "value": "Žiauru"
+            },
+            "jR51lvPy7": {
+                "value": "<div>pasakaitė ir laputė</div><div>o sun s ok</div>"
+            }
+        },
+        "rWGBmuPMA": {
+            "xLwjoZmmH": {
+                "value": "Kodėl?"
+            },
+            "jR51lvPy7": {
+                "value": "<div>žvėris</div><div>Testas Ko ooooooo assda asdasd</div><div></div>"
+            }
+        },
+        "rMN1Gti45": {
+            "xLwjoZmmH": {
+                "value": "zzz<br>"
+            },
+            "jR51lvPy7": {
+                "value": "nebeprisikiškekopūsteliavome"
+            }
+        },
+        "q7GtQTKHe": {
+            "jR51lvPy7": {
+                "value": "ai čia"
+            },
+            "xLwjoZmmH": {
+                "value": "aaa"
+            }
+        }
+    },
+    "images": {
+        "vbTBrDA66": {
+            "AIqt0k4-L": {
+                "url": "/api/imagefiles/delapouite coffee-cup"
+            }
+        },
+        "rgrMcY17I": {
+            "AIqt0k4-L": {
+                "url": "/api/imagefiles/delapouite nose-side"
+            },
+            "9Q6WnTaVq": {
+                "url": "/api/imagefiles/delapouite flying-fox"
+            }
+        },
+        "rWGBmuPMA": {
+            "AIqt0k4-L": {
+                "url": "/api/imagefiles/delapouite ram-profile"
+            },
+            "9Q6WnTaVq": {
+                "url": "/api/imagefiles/lorc hypodermic-test"
+            }
+        },
+        "e_m8YMQb3": {
+            "AIqt0k4-L": {
+                "url": "/api/imagefiles/delapouite all-seeing-eye"
+            },
+            "9Q6WnTaVq": {
+                "url": "/api/imagefiles/lorc test-tubes"
+            }
+        },
+        "rMN1Gti45": {
+            "AIqt0k4-L": {
+                "url": "/api/imagefiles/lorc dragon-head"
+            }
+        }
+    },
+    "pageWidth": 210,
+    "pageHeight": 297,
+    "topBottomMargin": 15,
+    "leftRightMargin": 9
+}
