@@ -168,7 +168,7 @@ function drawTextSlices(doc: PDFKit.PDFDocument, textSlices: TextSlice[], textOp
         let advanceWidth = (glyph.advanceWidth / textOptions.font.head.unitsPerEm) * textOptions.fontSize;
 
         lineToDraw.push({ glyph, color: textSlices[sliceNo].color, advanceWidth });
-        if (lineToDraw.length > 1 && textSlices[sliceNo][charNo] === ' ') {
+        if (lineToDraw.length > 1 && textSlices[sliceNo].text[charNo] === ' ') {
             lastSpace = lineToDraw.length - 1;
         }
 
@@ -203,7 +203,7 @@ function drawTextSlices(doc: PDFKit.PDFDocument, textSlices: TextSlice[], textOp
 }
 
 function drawText(node: XmlNode, doc: PDFKit.PDFDocument, color: string, textOptions: TextOptions): TextSlice[] {
-    let textSlices = [];
+    let textSlices: TextSlice[] = [];
     if (node.type !== 'element') {
         return [];
     }
@@ -263,7 +263,7 @@ export const generatePdf = async (
         let cardX = data.leftRightMargin * PTPMM;
         let cardY = data.topBottomMargin * PTPMM;
         let addNewPage = false;
-        let knownFonts = {};
+        let knownFonts: { [key: string]: any } = {};
 
         for (const cardId of data.cardsAllIds) {
             const cardInfo = data.cardsById[cardId];
