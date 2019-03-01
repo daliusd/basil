@@ -81,6 +81,7 @@ export interface JobData {
     cardsAllIds: string[];
     cardsById: CardsCollection;
     placeholders: PlaceholdersCollection;
+    placeholdersAllIds: string[];
     texts: PlaceholdersTextInfoByCardCollection;
     images: PlaceholdersImageInfoByCardCollection;
     pageWidth: number;
@@ -266,6 +267,9 @@ export const generatePdf = async (
 
         for (const cardId of data.cardsAllIds) {
             const cardInfo = data.cardsById[cardId];
+            const cardTexts = data.texts[cardId];
+            const cardImages = data.images[cardId];
+
             for (let idx = 0; idx < cardInfo.count; idx++) {
                 if (addNewPage) {
                     doc.addPage();
@@ -285,84 +289,87 @@ export const generatePdf = async (
 
                 doc.restore();
 
-                // Generate images
-                const cardImages = data.images[cardId];
-                for (const placeholderId in cardImages) {
-                    const imageInfo = cardImages[placeholderId];
+                for (const placeholderId of data.placeholdersAllIds) {
                     const placeholder = data.placeholders[placeholderId];
 
-                    if (placeholder.type !== 'image') {
-                        throw new Error('Corrupted data passed to PDF Generator.');
+                    if (placeholder.type === 'image' && cardImages) {
+                        const imageInfo = cardImages[placeholderId];
+
+                        if (imageInfo === undefined) continue;
+
+                        doc.save();
+                        doc.translate(
+                            cardX + (placeholder.x + placeholder.width / 2) * PTPMM,
+                            cardY + (placeholder.y + placeholder.height / 2) * PTPMM,
+                        );
+                        doc.rotate((placeholder.angle * 180) / Math.PI);
+                        doc.translate((-placeholder.width / 2) * PTPMM, (-placeholder.height / 2) * PTPMM);
+
+                        var resp = await makeRequest(serverUrl + imageInfo.url);
+                        const buf = buffer.Buffer.from(resp.data);
+
+                        if (resp.headers['content-type'] === 'image/svg+xml') {
+                            SVGtoPDF(doc, buf.toString(), 0, 0, {
+                                width: placeholder.width * PTPMM,
+                                height: placeholder.height * PTPMM,
+                            });
+                        } else {
+                            doc.image(buf, 0, 0, { width: placeholder.width * PTPMM });
+                        }
+
+                        doc.restore();
+                    } else if (placeholder.type === 'text' && cardTexts) {
+                        const textInfo = cardTexts[placeholderId];
+
+                        if (textInfo === undefined) continue;
+
+                        const placeholder = data.placeholders[placeholderId];
+
+                        if (placeholder.type !== 'text') {
+                            throw new Error('Corrupted data passed to PDF Generator.');
+                        }
+                        let text = `<div>${textInfo.value.replace(/<br>/g, '<br/>')}</div>`;
+                        let parsedText = new XmlDocument(text);
+
+                        doc.save();
+                        doc.translate(
+                            cardX + (placeholder.x + placeholder.width / 2) * PTPMM,
+                            cardY + (placeholder.y + placeholder.height / 2) * PTPMM,
+                        );
+                        doc.rotate((placeholder.angle * 180) / Math.PI);
+                        doc.translate((-placeholder.width / 2) * PTPMM, (-placeholder.height / 2) * PTPMM);
+
+                        const fontName = `${placeholder.fontFamily}:${placeholder.fontVariant}`;
+                        if (
+                            !(fontName in knownFonts) &&
+                            placeholder.fontFamily in webFonts &&
+                            placeholder.fontVariant in webFonts[placeholder.fontFamily]
+                        ) {
+                            let fontUrl = webFonts[placeholder.fontFamily][placeholder.fontVariant];
+                            fontUrl = fontUrl.replace('http://', 'https://');
+                            var arrayBuffer = await makeRequest(fontUrl);
+                            const buf = buffer.Buffer.from(arrayBuffer.data);
+
+                            let font = fontkit.create(buf);
+                            knownFonts[fontName] = font;
+                        }
+
+                        let font = knownFonts[fontName];
+
+                        let fontSize = placeholder.fontSize * PTPMM;
+                        const textOptions: TextOptions = {
+                            font,
+                            fontSize,
+                            align: placeholder.align,
+                            width: placeholder.width * PTPMM,
+                            height: placeholder.height * PTPMM,
+                            ascent: (font.hhea.ascent / font.head.unitsPerEm) * fontSize,
+                            scale: (1.0 / font.head.unitsPerEm) * fontSize,
+                        };
+                        drawText(parsedText, doc, placeholder.color, textOptions);
+
+                        doc.restore();
                     }
-
-                    var arrayBuffer = await makeRequest(serverUrl + imageInfo.url);
-                    const buf = buffer.Buffer.from(arrayBuffer.data);
-
-                    doc.save();
-                    doc.translate(
-                        cardX + (placeholder.x + placeholder.width / 2) * PTPMM,
-                        cardY + (placeholder.y + placeholder.height / 2) * PTPMM,
-                    );
-                    doc.rotate((placeholder.angle * 180) / Math.PI);
-                    doc.translate((-placeholder.width / 2) * PTPMM, (-placeholder.height / 2) * PTPMM);
-
-                    SVGtoPDF(doc, buf.toString(), 0, 0, {
-                        width: placeholder.width * PTPMM,
-                        height: placeholder.height * PTPMM,
-                    });
-
-                    doc.restore();
-                }
-                // Generate texts
-                const cardTexts = data.texts[cardId];
-                for (const placeholderId in cardTexts) {
-                    const textInfo = cardTexts[placeholderId];
-                    const placeholder = data.placeholders[placeholderId];
-
-                    if (placeholder.type !== 'text') {
-                        throw new Error('Corrupted data passed to PDF Generator.');
-                    }
-                    let text = `<div>${textInfo.value.replace(/<br>/g, '<br/>')}</div>`;
-                    let parsedText = new XmlDocument(text);
-
-                    doc.save();
-                    doc.translate(
-                        cardX + (placeholder.x + placeholder.width / 2) * PTPMM,
-                        cardY + (placeholder.y + placeholder.height / 2) * PTPMM,
-                    );
-                    doc.rotate((placeholder.angle * 180) / Math.PI);
-                    doc.translate((-placeholder.width / 2) * PTPMM, (-placeholder.height / 2) * PTPMM);
-
-                    const fontName = `${placeholder.fontFamily}:${placeholder.fontVariant}`;
-                    if (
-                        !(fontName in knownFonts) &&
-                        placeholder.fontFamily in webFonts &&
-                        placeholder.fontVariant in webFonts[placeholder.fontFamily]
-                    ) {
-                        let fontUrl = webFonts[placeholder.fontFamily][placeholder.fontVariant];
-                        fontUrl = fontUrl.replace('http://', 'https://');
-                        var arrayBuffer = await makeRequest(fontUrl);
-                        const buf = buffer.Buffer.from(arrayBuffer.data);
-
-                        let font = fontkit.create(buf);
-                        knownFonts[fontName] = font;
-                    }
-
-                    let font = knownFonts[fontName];
-
-                    let fontSize = placeholder.fontSize * PTPMM;
-                    const textOptions: TextOptions = {
-                        font,
-                        fontSize,
-                        align: placeholder.align,
-                        width: placeholder.width * PTPMM,
-                        height: placeholder.height * PTPMM,
-                        ascent: (font.hhea.ascent / font.head.unitsPerEm) * fontSize,
-                        scale: (1.0 / font.head.unitsPerEm) * fontSize,
-                    };
-                    drawText(parsedText, doc, placeholder.color, textOptions);
-
-                    doc.restore();
                 }
 
                 // Get next card position

@@ -49,6 +49,7 @@
             "fontSize": 6
         }
     },
+    "placeholdersAllIds": ["79J8OLBrK", "AIqt0k4-L", "xLwjoZmmH"],
     "texts": {
         "vbTBrDA66": { "79J8OLBrK": { "value": "Tes" }, "xLwjoZmmH": { "value": "test" } },
         "rgrMcY17I": { "79J8OLBrK": { "value": "123jhk" }, "xLwjoZmmH": { "value": "asd" } },
