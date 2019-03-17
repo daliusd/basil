@@ -43,6 +43,7 @@ export interface ImagePlaceholderType {
     width: number;
     height: number;
     angle: number;
+    fit?: string;
 }
 
 export type PlaceholderType = TextPlaceholderType | ImagePlaceholderType;
@@ -314,7 +315,16 @@ export const generatePdf = async (
                                 height: placeholder.height * PTPMM,
                             });
                         } else {
-                            doc.image(buf, 0, 0, { width: placeholder.width * PTPMM });
+                            doc.image(buf, 0, 0, {
+                                width:
+                                    !placeholder.fit || placeholder.fit === 'width' || placeholder.fit === 'stretch'
+                                        ? placeholder.width * PTPMM
+                                        : undefined,
+                                height:
+                                    placeholder.fit === 'height' || placeholder.fit === 'stretch'
+                                        ? placeholder.height * PTPMM
+                                        : undefined,
+                            });
                         }
 
                         doc.restore();
@@ -329,7 +339,12 @@ export const generatePdf = async (
                             throw new Error('Corrupted data passed to PDF Generator.');
                         }
                         let text = `<div>${textInfo.value.replace(/<br>/g, '<br/>')}</div>`;
-                        let parsedText = new XmlDocument(text);
+                        let parsedText = new XmlDocument('<div></div>');
+                        try {
+                            parsedText = new XmlDocument(text);
+                        } catch (error) {
+                            // TODO: we should do something with errors like this one
+                        }
 
                         doc.save();
                         doc.translate(

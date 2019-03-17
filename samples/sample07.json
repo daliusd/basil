@@ -1,0 +1,125 @@
+{
+    "width": 63.5,
+    "height": 88.9,
+    "cardsAllIds": ["TJ-3NoGp3", "cFteIAAQA", "AeuERguPp", "xyE39gY9b"],
+    "cardsById": {
+        "TJ-3NoGp3": {
+            "id": "TJ-3NoGp3",
+            "count": 1
+        },
+        "AeuERguPp": {
+            "id": "AeuERguPp",
+            "count": 1
+        },
+        "cFteIAAQA": {
+            "id": "cFteIAAQA",
+            "count": 1
+        },
+        "xyE39gY9b": {
+            "id": "xyE39gY9b",
+            "count": 1
+        }
+    },
+    "placeholders": {
+        "M217hzhU_": {
+            "id": "M217hzhU_",
+            "type": "text",
+            "x": 3.7041666666666666,
+            "y": 64.29375,
+            "width": 55.297916666666666,
+            "height": 20.37291666666667,
+            "angle": 0.0005875998133728633,
+            "align": "left",
+            "color": "#000000",
+            "fontFamily": "Milonga",
+            "fontVariant": "regular",
+            "fontSize": 11,
+            "name": "title",
+            "locked": true
+        },
+        "h9G7KewCr": {
+            "id": "h9G7KewCr",
+            "type": "image",
+            "x": 39.15833333333333,
+            "y": 5.291666666666667,
+            "width": 20.902083333333334,
+            "height": 21.43125,
+            "angle": -0.009919672262299617,
+            "name": "sub",
+            "locked": true
+        },
+        "SnnZtO2uc": {
+            "id": "SnnZtO2uc",
+            "type": "image",
+            "x": 4.7625,
+            "y": 22.754166666666666,
+            "width": 35.71875,
+            "height": 37.30625,
+            "angle": 0.005071975139633977,
+            "name": "main",
+            "locked": true,
+            "fit": "stretch"
+        }
+    },
+    "placeholdersAllIds": ["M217hzhU_", "SnnZtO2uc", "h9G7KewCr"],
+    "texts": {
+        "TJ-3NoGp3": {
+            "M217hzhU_": {
+                "value": "Smart"
+            }
+        },
+        "AeuERguPp": {
+            "M217hzhU_": {
+                "value": "L<img src=\"http://localhost:3000/static/media/rotate.470ffe2e.svg\" alt=\"rotate\" class=\"FieldController_controller__VCesw\" style=\"position: absolute; left: 0px; bottom: 0px; cursor: url(&quot;/static/media/rotate.470ffe2e.svg&quot;), auto;\">over"
+            }
+        },
+        "cFteIAAQA": {
+            "M217hzhU_": {
+                "value": "Wife"
+            }
+        },
+        "xyE39gY9b": {
+            "M217hzhU_": {
+                "value": "Lover"
+            }
+        }
+    },
+    "images": {
+        "TJ-3NoGp3": {
+            "SnnZtO2uc": {
+                "url": "/api/imagefiles/DSC02376.jpg_0b82639fb43ddb7a8708225fa9c50c9a"
+            },
+            "h9G7KewCr": {
+                "url": "/api/imagefiles/twitter_white_flower"
+            }
+        },
+        "AeuERguPp": {
+            "SnnZtO2uc": {
+                "url": "/api/imagefiles/DSC02376.jpg_0b82639fb43ddb7a8708225fa9c50c9a"
+            },
+            "h9G7KewCr": {
+                "url": "/api/imagefiles/noto_astonished_face"
+            }
+        },
+        "cFteIAAQA": {
+            "h9G7KewCr": {
+                "url": "/api/imagefiles/noto_wilted_flower"
+            },
+            "SnnZtO2uc": {
+                "url": "/api/imagefiles/DSC02677.jpg_c81e728d9d4c2f636f067f89cc14862c"
+            }
+        },
+        "xyE39gY9b": {
+            "SnnZtO2uc": {
+                "url": "/api/imagefiles/DSC02376.jpg_0b82639fb43ddb7a8708225fa9c50c9a"
+            },
+            "h9G7KewCr": {
+                "url": "/api/imagefiles/noto_smiling_face_with_open_mouth_and_cold_sweat_sweat_smile"
+            }
+        }
+    },
+    "pageWidth": 210,
+    "pageHeight": 297,
+    "topBottomMargin": 15,
+    "leftRightMargin": 9
+}
