@@ -66,6 +66,7 @@ export interface PlaceholdersTextInfoByCardCollection {
 
 export interface ImageInfo {
     url: string;
+    base64?: string;
 }
 
 export interface PlaceholdersImageInfoCollection {
@@ -306,25 +307,34 @@ export const generatePdf = async (
                         doc.rotate((placeholder.angle * 180) / Math.PI);
                         doc.translate((-placeholder.width / 2) * PTPMM, (-placeholder.height / 2) * PTPMM);
 
-                        var resp = await makeRequest(serverUrl + imageInfo.url);
-                        const buf = buffer.Buffer.from(resp.data);
-
-                        if (resp.headers['content-type'] === 'image/svg+xml') {
-                            SVGtoPDF(doc, buf.toString(), 0, 0, {
+                        if (imageInfo.base64) {
+                            SVGtoPDF(doc, atob(imageInfo.base64), 0, 0, {
                                 width: placeholder.width * PTPMM,
                                 height: placeholder.height * PTPMM,
                             });
                         } else {
-                            doc.image(buf, 0, 0, {
-                                width:
-                                    !placeholder.fit || placeholder.fit === 'width' || placeholder.fit === 'stretch'
-                                        ? placeholder.width * PTPMM
-                                        : undefined,
-                                height:
-                                    placeholder.fit === 'height' || placeholder.fit === 'stretch'
-                                        ? placeholder.height * PTPMM
-                                        : undefined,
-                            });
+                            let resp = await makeRequest(serverUrl + imageInfo.url);
+                            const buf = buffer.Buffer.from(resp.data);
+
+                            if (resp.headers['content-type'] === 'image/svg+xml') {
+                                SVGtoPDF(doc, buf.toString(), 0, 0, {
+                                    width: placeholder.width * PTPMM,
+                                    height: placeholder.height * PTPMM,
+                                    preserveAspectRatio:
+                                        placeholder.fit === 'height' ? 'xMinYMid slice' : 'xMidYMin meet',
+                                });
+                            } else {
+                                doc.image(buf, 0, 0, {
+                                    width:
+                                        !placeholder.fit || placeholder.fit === 'width' || placeholder.fit === 'stretch'
+                                            ? placeholder.width * PTPMM
+                                            : undefined,
+                                    height:
+                                        placeholder.fit === 'height' || placeholder.fit === 'stretch'
+                                            ? placeholder.height * PTPMM
+                                            : undefined,
+                                });
+                            }
                         }
 
                         doc.restore();
