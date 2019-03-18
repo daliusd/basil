@@ -312,6 +312,12 @@ export const generatePdf = async (
                             SVGtoPDF(doc, svg.toString(), 0, 0, {
                                 width: placeholder.width * PTPMM,
                                 height: placeholder.height * PTPMM,
+                                preserveAspectRatio:
+                                    placeholder.fit === 'stretch'
+                                        ? 'none'
+                                        : placeholder.fit === 'height'
+                                        ? 'xMinYMid slice'
+                                        : 'xMidYMin meet',
                             });
                         } else if (imageInfo.url) {
                             try {
