@@ -33,6 +33,7 @@ export interface TextPlaceholderType {
     fontFamily: string;
     fontVariant: string;
     fontSize: number;
+    lineHeight: number;
 }
 
 export interface ImagePlaceholderType {
@@ -111,6 +112,7 @@ interface TextSlice {
 interface TextOptions {
     font: any;
     fontSize: number;
+    lineHeight: number;
     align: string;
     width: number;
     height: number;
@@ -189,7 +191,7 @@ function drawTextSlices(doc: PDFKit.PDFDocument, textSlices: TextSlice[], textOp
             lineWidth = lineToDraw.map(l => l.advanceWidth).reduce((a, b) => a + b, 0);
             lastSpace = -1;
 
-            doc.translate(0, textOptions.fontSize * 1.27); // Move cursor one text line down
+            doc.translate(0, textOptions.fontSize * textOptions.lineHeight); // Move cursor one text line down
         }
 
         charNo++;
@@ -200,7 +202,7 @@ function drawTextSlices(doc: PDFKit.PDFDocument, textSlices: TextSlice[], textOp
     }
     if (lineToDraw.length > 0) {
         drawTextLine(doc, lineToDraw, textOptions);
-        doc.translate(0, textOptions.fontSize * 1.27); // Move cursor one text line down
+        doc.translate(0, textOptions.fontSize * textOptions.lineHeight); // Move cursor one text line down
     }
 }
 
@@ -395,13 +397,18 @@ export const generatePdf = async (
                         let font = knownFonts[fontName];
 
                         let fontSize = placeholder.fontSize * PTPMM;
+
+                        const fontHeight = (font.hhea.ascent - font.hhea.descent) / font.head.unitsPerEm;
+                        const addOn = ((placeholder.lineHeight || 1.27) - fontHeight) / 2;
+
                         const textOptions: TextOptions = {
                             font,
                             fontSize,
+                            lineHeight: placeholder.lineHeight || 1.27,
                             align: placeholder.align,
                             width: placeholder.width * PTPMM,
                             height: placeholder.height * PTPMM,
-                            ascent: (font.hhea.ascent / font.head.unitsPerEm) * fontSize,
+                            ascent: (addOn + font.hhea.ascent / font.head.unitsPerEm) * fontSize,
                             scale: (1.0 / font.head.unitsPerEm) * fontSize,
                         };
                         drawText(parsedText, doc, placeholder.color, textOptions);
