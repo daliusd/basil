@@ -20,30 +20,32 @@ export interface CardsCollection {
     [propName: string]: CardType;
 }
 
-export interface TextPlaceholderType {
+export interface PlaceholderBase {
     id: string;
-    type: 'text';
+    type: string;
     x: number;
     y: number;
     width: number;
     height: number;
     angle: number;
+    locked?: boolean;
+    name?: string;
+    isOnBack?: boolean;
+}
+
+export interface TextPlaceholderType extends PlaceholderBase {
+    type: 'text';
     align: string;
     color: string;
     fontFamily: string;
     fontVariant: string;
     fontSize: number;
-    lineHeight: number;
+    lineHeight?: number;
 }
 
-export interface ImagePlaceholderType {
+export interface ImagePlaceholderType extends PlaceholderBase {
     id: string;
     type: 'image';
-    x: number;
-    y: number;
-    width: number;
-    height: number;
-    angle: number;
     fit?: string;
 }
 
@@ -81,6 +83,7 @@ export interface PlaceholdersImageInfoByCardCollection {
 export interface JobData {
     width: number;
     height: number;
+    isTwoSided: boolean;
     cardsAllIds: string[];
     cardsById: CardsCollection;
     placeholders: PlaceholdersCollection;
@@ -231,6 +234,168 @@ function drawText(node: XmlNode, doc: PDFKit.PDFDocument, color: string, textOpt
     return textSlices;
 }
 
+async function drawCutLines(
+    doc: PDFKit.PDFDocument,
+    cardX: number,
+    cardY: number,
+    cardWidth: number,
+    cardHeight: number,
+) {
+    doc.save();
+    doc.moveTo(cardX, cardY)
+        .lineTo(cardX + cardWidth, cardY)
+        .lineTo(cardX + cardWidth, cardY + cardHeight)
+        .lineTo(cardX, cardY + cardHeight)
+        .lineTo(cardX, cardY)
+        .dash(2 * PTPMM, {})
+        .lineWidth(0.1 * PTPMM)
+        .stroke('#ccc');
+
+    doc.restore();
+}
+
+async function drawCard(
+    doc: PDFKit.PDFDocument,
+    data: JobData,
+    serverUrl: string,
+    knownFonts: { [key: string]: any },
+    isBack: boolean,
+    cardId: string,
+    cardX: number,
+    cardY: number,
+    cardWidth: number,
+    cardHeight: number,
+) {
+    const cardImages = data.images[cardId];
+    const cardTexts = data.texts[cardId];
+
+    for (const placeholderId of data.placeholdersAllIds) {
+        const placeholder = data.placeholders[placeholderId];
+        if ((placeholder.isOnBack || false) !== isBack) {
+            continue;
+        }
+
+        if (placeholder.type === 'image' && cardImages) {
+            const imageInfo = cardImages[placeholderId];
+
+            if (imageInfo === undefined) continue;
+
+            doc.save();
+            doc.translate(
+                cardX + (placeholder.x + placeholder.width / 2) * PTPMM,
+                cardY + (placeholder.y + placeholder.height / 2) * PTPMM,
+            );
+            doc.rotate((placeholder.angle * 180) / Math.PI);
+            doc.translate((-placeholder.width / 2) * PTPMM, (-placeholder.height / 2) * PTPMM);
+
+            if (imageInfo.base64) {
+                const svg = Buffer.from(imageInfo.base64, 'base64');
+                SVGtoPDF(doc, svg.toString(), 0, 0, {
+                    width: placeholder.width * PTPMM,
+                    height: placeholder.height * PTPMM,
+                    preserveAspectRatio:
+                        placeholder.fit === 'stretch'
+                            ? 'none'
+                            : placeholder.fit === 'height'
+                            ? 'xMinYMid slice'
+                            : 'xMidYMin meet',
+                });
+            } else if (imageInfo.url) {
+                try {
+                    let resp = await makeRequest(serverUrl + imageInfo.url);
+                    const buf = buffer.Buffer.from(resp.data);
+
+                    if (resp.headers['content-type'] === 'image/svg+xml') {
+                        SVGtoPDF(doc, buf.toString(), 0, 0, {
+                            width: placeholder.width * PTPMM,
+                            height: placeholder.height * PTPMM,
+                            preserveAspectRatio: placeholder.fit === 'height' ? 'xMinYMid slice' : 'xMidYMin meet',
+                        });
+                    } else {
+                        doc.image(buf, 0, 0, {
+                            width:
+                                !placeholder.fit || placeholder.fit === 'width' || placeholder.fit === 'stretch'
+                                    ? placeholder.width * PTPMM
+                                    : undefined,
+                            height:
+                                placeholder.fit === 'height' || placeholder.fit === 'stretch'
+                                    ? placeholder.height * PTPMM
+                                    : undefined,
+                        });
+                    }
+                } catch {
+                    // TODO: handle error here
+                }
+            }
+
+            doc.restore();
+        } else if (placeholder.type === 'text' && cardTexts) {
+            const textInfo = cardTexts[placeholderId];
+
+            if (textInfo === undefined) continue;
+
+            const placeholder = data.placeholders[placeholderId];
+
+            if (placeholder.type !== 'text') {
+                throw new Error('Corrupted data passed to PDF Generator.');
+            }
+            let text = `<div>${textInfo.value.replace(/<br>/g, '<br/>')}</div>`;
+            let parsedText = new XmlDocument('<div></div>');
+            try {
+                parsedText = new XmlDocument(text);
+            } catch (error) {
+                // TODO: we should do something with errors like this one
+            }
+
+            doc.save();
+            doc.translate(
+                cardX + (placeholder.x + placeholder.width / 2) * PTPMM,
+                cardY + (placeholder.y + placeholder.height / 2) * PTPMM,
+            );
+            doc.rotate((placeholder.angle * 180) / Math.PI);
+            doc.translate((-placeholder.width / 2) * PTPMM, (-placeholder.height / 2) * PTPMM);
+
+            const fontName = `${placeholder.fontFamily}:${placeholder.fontVariant}`;
+            if (
+                !(fontName in knownFonts) &&
+                placeholder.fontFamily in webFonts &&
+                placeholder.fontVariant in webFonts[placeholder.fontFamily]
+            ) {
+                let fontUrl = webFonts[placeholder.fontFamily][placeholder.fontVariant];
+                fontUrl = fontUrl.replace('http://', 'https://');
+                var arrayBuffer = await makeRequest(fontUrl);
+                const buf = buffer.Buffer.from(arrayBuffer.data);
+
+                let font = fontkit.create(buf);
+                knownFonts[fontName] = font;
+            }
+
+            let font = knownFonts[fontName];
+
+            let fontSize = placeholder.fontSize * PTPMM;
+
+            const fontHeight = (font.hhea.ascent - font.hhea.descent) / font.head.unitsPerEm;
+            const addOn = ((placeholder.lineHeight || 1.27) - fontHeight) / 2;
+
+            const textOptions: TextOptions = {
+                font,
+                fontSize,
+                lineHeight: placeholder.lineHeight || 1.27,
+                align: placeholder.align,
+                width: placeholder.width * PTPMM,
+                height: placeholder.height * PTPMM,
+                ascent: (addOn + font.hhea.ascent / font.head.unitsPerEm) * fontSize,
+                scale: (1.0 / font.head.unitsPerEm) * fontSize,
+            };
+            drawText(parsedText, doc, placeholder.color, textOptions);
+
+            doc.restore();
+        }
+    }
+
+    await drawCutLines(doc, cardX, cardY, cardWidth, cardHeight);
+}
+
 // PDF generation
 
 export const generatePdf = async (
@@ -262,171 +427,70 @@ export const generatePdf = async (
             );
         }
 
-        let cardWidth = data.width * PTPMM;
-        let cardHeight = data.height * PTPMM;
-        let cardX = data.leftRightMargin * PTPMM;
-        let cardY = data.topBottomMargin * PTPMM;
+        const pageWidth = data.pageWidth * PTPMM;
+        const pageHeight = data.pageHeight * PTPMM;
+        const leftRightMargin = data.leftRightMargin * PTPMM;
+        const topBottomMargin = data.topBottomMargin * PTPMM;
+        const cardWidth = data.width * PTPMM;
+        const cardHeight = data.height * PTPMM;
+
+        let cardX = leftRightMargin;
+        let cardY = topBottomMargin;
         let addNewPage = false;
         let knownFonts: { [key: string]: any } = {};
+        let frontCards: { cardX: number; cardY: number; cardId: string }[] = [];
 
         for (const cardId of data.cardsAllIds) {
             const cardInfo = data.cardsById[cardId];
-            const cardTexts = data.texts[cardId];
-            const cardImages = data.images[cardId];
 
             for (let idx = 0; idx < cardInfo.count; idx++) {
                 if (addNewPage) {
+                    if (data.isTwoSided) {
+                        doc.addPage();
+                        for (const cardInfo of frontCards) {
+                            let x = pageWidth - cardInfo.cardX - cardWidth;
+                            let y = cardInfo.cardY;
+                            await drawCard(
+                                doc,
+                                data,
+                                serverUrl,
+                                knownFonts,
+                                true,
+                                cardInfo.cardId,
+                                x,
+                                y,
+                                cardWidth,
+                                cardHeight,
+                            );
+                        }
+
+                        frontCards = [];
+                    }
                     doc.addPage();
                     addNewPage = false;
                 }
-                // Draw card cut lines
-                doc.save();
-
-                doc.moveTo(cardX, cardY)
-                    .lineTo(cardX + cardWidth, cardY)
-                    .lineTo(cardX + cardWidth, cardY + cardHeight)
-                    .lineTo(cardX, cardY + cardHeight)
-                    .lineTo(cardX, cardY)
-                    .dash(2 * PTPMM, {})
-                    .lineWidth(0.1 * PTPMM)
-                    .fillAndStroke('#fff', '#ccc');
-
-                doc.restore();
-
-                for (const placeholderId of data.placeholdersAllIds) {
-                    const placeholder = data.placeholders[placeholderId];
-
-                    if (placeholder.type === 'image' && cardImages) {
-                        const imageInfo = cardImages[placeholderId];
-
-                        if (imageInfo === undefined) continue;
-
-                        doc.save();
-                        doc.translate(
-                            cardX + (placeholder.x + placeholder.width / 2) * PTPMM,
-                            cardY + (placeholder.y + placeholder.height / 2) * PTPMM,
-                        );
-                        doc.rotate((placeholder.angle * 180) / Math.PI);
-                        doc.translate((-placeholder.width / 2) * PTPMM, (-placeholder.height / 2) * PTPMM);
-
-                        if (imageInfo.base64) {
-                            const svg = Buffer.from(imageInfo.base64, 'base64');
-                            SVGtoPDF(doc, svg.toString(), 0, 0, {
-                                width: placeholder.width * PTPMM,
-                                height: placeholder.height * PTPMM,
-                                preserveAspectRatio:
-                                    placeholder.fit === 'stretch'
-                                        ? 'none'
-                                        : placeholder.fit === 'height'
-                                        ? 'xMinYMid slice'
-                                        : 'xMidYMin meet',
-                            });
-                        } else if (imageInfo.url) {
-                            try {
-                                let resp = await makeRequest(serverUrl + imageInfo.url);
-                                const buf = buffer.Buffer.from(resp.data);
-
-                                if (resp.headers['content-type'] === 'image/svg+xml') {
-                                    SVGtoPDF(doc, buf.toString(), 0, 0, {
-                                        width: placeholder.width * PTPMM,
-                                        height: placeholder.height * PTPMM,
-                                        preserveAspectRatio:
-                                            placeholder.fit === 'height' ? 'xMinYMid slice' : 'xMidYMin meet',
-                                    });
-                                } else {
-                                    doc.image(buf, 0, 0, {
-                                        width:
-                                            !placeholder.fit ||
-                                            placeholder.fit === 'width' ||
-                                            placeholder.fit === 'stretch'
-                                                ? placeholder.width * PTPMM
-                                                : undefined,
-                                        height:
-                                            placeholder.fit === 'height' || placeholder.fit === 'stretch'
-                                                ? placeholder.height * PTPMM
-                                                : undefined,
-                                    });
-                                }
-                            } catch {
-                                // TODO: handle error here
-                            }
-                        }
-
-                        doc.restore();
-                    } else if (placeholder.type === 'text' && cardTexts) {
-                        const textInfo = cardTexts[placeholderId];
-
-                        if (textInfo === undefined) continue;
-
-                        const placeholder = data.placeholders[placeholderId];
-
-                        if (placeholder.type !== 'text') {
-                            throw new Error('Corrupted data passed to PDF Generator.');
-                        }
-                        let text = `<div>${textInfo.value.replace(/<br>/g, '<br/>')}</div>`;
-                        let parsedText = new XmlDocument('<div></div>');
-                        try {
-                            parsedText = new XmlDocument(text);
-                        } catch (error) {
-                            // TODO: we should do something with errors like this one
-                        }
-
-                        doc.save();
-                        doc.translate(
-                            cardX + (placeholder.x + placeholder.width / 2) * PTPMM,
-                            cardY + (placeholder.y + placeholder.height / 2) * PTPMM,
-                        );
-                        doc.rotate((placeholder.angle * 180) / Math.PI);
-                        doc.translate((-placeholder.width / 2) * PTPMM, (-placeholder.height / 2) * PTPMM);
-
-                        const fontName = `${placeholder.fontFamily}:${placeholder.fontVariant}`;
-                        if (
-                            !(fontName in knownFonts) &&
-                            placeholder.fontFamily in webFonts &&
-                            placeholder.fontVariant in webFonts[placeholder.fontFamily]
-                        ) {
-                            let fontUrl = webFonts[placeholder.fontFamily][placeholder.fontVariant];
-                            fontUrl = fontUrl.replace('http://', 'https://');
-                            var arrayBuffer = await makeRequest(fontUrl);
-                            const buf = buffer.Buffer.from(arrayBuffer.data);
-
-                            let font = fontkit.create(buf);
-                            knownFonts[fontName] = font;
-                        }
-
-                        let font = knownFonts[fontName];
-
-                        let fontSize = placeholder.fontSize * PTPMM;
-
-                        const fontHeight = (font.hhea.ascent - font.hhea.descent) / font.head.unitsPerEm;
-                        const addOn = ((placeholder.lineHeight || 1.27) - fontHeight) / 2;
-
-                        const textOptions: TextOptions = {
-                            font,
-                            fontSize,
-                            lineHeight: placeholder.lineHeight || 1.27,
-                            align: placeholder.align,
-                            width: placeholder.width * PTPMM,
-                            height: placeholder.height * PTPMM,
-                            ascent: (addOn + font.hhea.ascent / font.head.unitsPerEm) * fontSize,
-                            scale: (1.0 / font.head.unitsPerEm) * fontSize,
-                        };
-                        drawText(parsedText, doc, placeholder.color, textOptions);
-
-                        doc.restore();
-                    }
-                }
+                frontCards.push({ cardX, cardY, cardId });
+                await drawCard(doc, data, serverUrl, knownFonts, false, cardId, cardX, cardY, cardWidth, cardHeight);
 
                 // Get next card position
                 cardX += cardWidth;
-                if (cardX + cardWidth > (data.pageWidth - data.leftRightMargin) * PTPMM) {
-                    cardX = data.leftRightMargin * PTPMM;
+                if (cardX + cardWidth > pageWidth - leftRightMargin) {
+                    cardX = leftRightMargin;
                     cardY += cardHeight;
-                    if (cardY + cardHeight > (data.pageHeight - data.topBottomMargin) * PTPMM) {
-                        cardY = data.topBottomMargin * PTPMM;
+                    if (cardY + cardHeight > pageHeight - topBottomMargin) {
+                        cardY = topBottomMargin;
                         addNewPage = true;
                     }
                 }
+            }
+        }
+
+        if (data.isTwoSided && frontCards.length > 0) {
+            doc.addPage();
+            for (const cardInfo of frontCards) {
+                let x = pageWidth - cardInfo.cardX - cardWidth;
+                let y = cardInfo.cardY;
+                await drawCard(doc, data, serverUrl, knownFonts, true, cardInfo.cardId, x, y, cardWidth, cardHeight);
             }
         }
 
