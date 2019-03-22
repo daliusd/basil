@@ -92,6 +92,8 @@ export interface JobData {
     pageHeight: number;
     topBottomMargin: number;
     leftRightMargin: number;
+    verticalSpace: number;
+    horizontalSpace: number;
     includeBleedingArea: boolean;
 }
 
@@ -472,6 +474,9 @@ export const generatePdf = async (
         const pageHeight = data.pageHeight * PTPMM;
         const leftRightMargin = data.leftRightMargin * PTPMM;
         const topBottomMargin = data.topBottomMargin * PTPMM;
+        const verticalSpace = data.verticalSpace * PTPMM;
+        const horizontalSpace = data.horizontalSpace * PTPMM;
+
         const cardWidth = (cardsetData.width + (data.includeBleedingArea ? BLEED_WIDTH * 2 : 0)) * PTPMM;
         const cardHeight = (cardsetData.height + (data.includeBleedingArea ? BLEED_WIDTH * 2 : 0)) * PTPMM;
 
@@ -527,10 +532,10 @@ export const generatePdf = async (
                 );
 
                 // Get next card position
-                cardX += cardWidth;
+                cardX += cardWidth + verticalSpace;
                 if (cardX + cardWidth > pageWidth - leftRightMargin) {
                     cardX = leftRightMargin;
-                    cardY += cardHeight;
+                    cardY += cardHeight + horizontalSpace;
                     if (cardY + cardHeight > pageHeight - topBottomMargin) {
                         cardY = topBottomMargin;
                         addNewPage = true;

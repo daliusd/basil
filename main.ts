@@ -11,13 +11,15 @@ const generatePdfForSample = async (username: string, password: string) => {
         const accessToken = resp.data['accessToken'];
 
         const data: JobData = {
+            collectionType: 'cardsets',
+            collectionId: '2',
             pageWidth: 210,
             pageHeight: 297,
             topBottomMargin: 15,
             leftRightMargin: 9,
-            collectionType: 'cardsets',
-            collectionId: '2',
-            includeBleedingArea: true,
+            verticalSpace: 0,
+            horizontalSpace: 0,
+            includeBleedingArea: false,
             accessToken,
         };
 
