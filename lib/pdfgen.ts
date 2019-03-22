@@ -85,6 +85,16 @@ export interface PlaceholdersImageInfoByCardCollection {
 }
 
 export interface JobData {
+    accessToken: string;
+    collectionType: string;
+    collectionId: string;
+    pageWidth: number;
+    pageHeight: number;
+    topBottomMargin: number;
+    leftRightMargin: number;
+}
+
+export interface CardSetData {
     width: number;
     height: number;
     isTwoSided: boolean;
@@ -94,10 +104,6 @@ export interface JobData {
     placeholdersAllIds: string[];
     texts: PlaceholdersTextInfoByCardCollection;
     images: PlaceholdersImageInfoByCardCollection;
-    pageWidth: number;
-    pageHeight: number;
-    topBottomMargin: number;
-    leftRightMargin: number;
 }
 
 // PDF Generator
@@ -108,6 +114,14 @@ const makeRequest = async (url: string) => {
     return await axios.get(url, {
         responseType: 'arraybuffer',
     });
+};
+
+const makeAuthRequest = async (url: string, token: string) => {
+    let config = {
+        headers: { Authorization: `Bearer ${token}` },
+    };
+
+    return await axios.get(url, config);
 };
 
 // Text drawing
@@ -260,7 +274,7 @@ async function drawCutLines(
 
 async function drawCard(
     doc: PDFKit.PDFDocument,
-    data: JobData,
+    data: CardSetData,
     serverUrl: string,
     knownFonts: { [key: string]: any },
     isBack: boolean,
@@ -416,6 +430,12 @@ export const generatePdf = async (
     callback: () => void,
 ) => {
     try {
+        let resp = await makeAuthRequest(
+            `${serverUrl}/api/${data.collectionType}/${data.collectionId}`,
+            data.accessToken,
+        );
+        let cardsetData: CardSetData = JSON.parse(resp.data.data);
+
         const doc = new PDFDocument({
             size: [data.pageWidth * PTPMM, data.pageHeight * PTPMM],
             info: {
@@ -426,13 +446,13 @@ export const generatePdf = async (
 
         const stream = doc.pipe(outStream);
 
-        if (data.topBottomMargin * 2 + data.height > data.pageHeight) {
+        if (data.topBottomMargin * 2 + cardsetData.height > data.pageHeight) {
             throw new Error(
                 'Cards do not fit in the page (height and margins are larger then page height). Reduce margins or card size.',
             );
         }
 
-        if (data.leftRightMargin * 2 + data.width > data.pageWidth) {
+        if (data.leftRightMargin * 2 + cardsetData.width > data.pageWidth) {
             throw new Error(
                 'Cards do not fit in the page (width and margins are larger then page width). Reduce margins or card size.',
             );
@@ -442,8 +462,8 @@ export const generatePdf = async (
         const pageHeight = data.pageHeight * PTPMM;
         const leftRightMargin = data.leftRightMargin * PTPMM;
         const topBottomMargin = data.topBottomMargin * PTPMM;
-        const cardWidth = data.width * PTPMM;
-        const cardHeight = data.height * PTPMM;
+        const cardWidth = cardsetData.width * PTPMM;
+        const cardHeight = cardsetData.height * PTPMM;
 
         let cardX = leftRightMargin;
         let cardY = topBottomMargin;
@@ -451,19 +471,19 @@ export const generatePdf = async (
         let knownFonts: { [key: string]: any } = {};
         let frontCards: { cardX: number; cardY: number; cardId: string }[] = [];
 
-        for (const cardId of data.cardsAllIds) {
-            const cardInfo = data.cardsById[cardId];
+        for (const cardId of cardsetData.cardsAllIds) {
+            const cardInfo = cardsetData.cardsById[cardId];
 
             for (let idx = 0; idx < cardInfo.count; idx++) {
                 if (addNewPage) {
-                    if (data.isTwoSided) {
+                    if (cardsetData.isTwoSided) {
                         doc.addPage();
                         for (const cardInfo of frontCards) {
                             let x = pageWidth - cardInfo.cardX - cardWidth;
                             let y = cardInfo.cardY;
                             await drawCard(
                                 doc,
-                                data,
+                                cardsetData,
                                 serverUrl,
                                 knownFonts,
                                 true,
@@ -481,7 +501,18 @@ export const generatePdf = async (
                     addNewPage = false;
                 }
                 frontCards.push({ cardX, cardY, cardId });
-                await drawCard(doc, data, serverUrl, knownFonts, false, cardId, cardX, cardY, cardWidth, cardHeight);
+                await drawCard(
+                    doc,
+                    cardsetData,
+                    serverUrl,
+                    knownFonts,
+                    false,
+                    cardId,
+                    cardX,
+                    cardY,
+                    cardWidth,
+                    cardHeight,
+                );
 
                 // Get next card position
                 cardX += cardWidth;
@@ -496,12 +527,23 @@ export const generatePdf = async (
             }
         }
 
-        if (data.isTwoSided && frontCards.length > 0) {
+        if (cardsetData.isTwoSided && frontCards.length > 0) {
             doc.addPage();
             for (const cardInfo of frontCards) {
                 let x = pageWidth - cardInfo.cardX - cardWidth;
                 let y = cardInfo.cardY;
-                await drawCard(doc, data, serverUrl, knownFonts, true, cardInfo.cardId, x, y, cardWidth, cardHeight);
+                await drawCard(
+                    doc,
+                    cardsetData,
+                    serverUrl,
+                    knownFonts,
+                    true,
+                    cardInfo.cardId,
+                    x,
+                    y,
+                    cardWidth,
+                    cardHeight,
+                );
             }
         }
 

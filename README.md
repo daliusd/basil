@@ -5,7 +5,7 @@ PDF Generator for Cardamon/Saffron.
 
 Test worker standalone:
 ```
-npm start -- --sample 04 && xdg-open output.pdf
+npm start -- --username dalius --password P && xdg-open output.pdf
 ```
 
 If you want to do development change directory to "app" before running editor
