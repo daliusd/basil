@@ -17,6 +17,7 @@ const generatePdfForSample = async (username: string, password: string) => {
             leftRightMargin: 9,
             collectionType: 'cardsets',
             collectionId: '2',
+            includeBleedingArea: true,
             accessToken,
         };
 
