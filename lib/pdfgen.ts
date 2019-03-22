@@ -257,6 +257,44 @@ function drawText(node: XmlNode, doc: PDFKit.PDFDocument, color: string, textOpt
     return textSlices;
 }
 
+function drawCutMarksForGuillotine(
+    doc: PDFKit.PDFDocument,
+    verticalGuillotineMarks: number[],
+    horizontalGuillotineMarks: number[],
+    pageWidth: number,
+    pageHeight: number,
+    leftRightMargin: number,
+    topBottomMargin: number,
+) {
+    doc.save();
+
+    for (const x of verticalGuillotineMarks) {
+        doc.moveTo(x, 0)
+            .lineTo(x, topBottomMargin / 2)
+            .lineWidth(0.1 * PTPMM)
+            .stroke('#000');
+
+        doc.moveTo(x, pageHeight)
+            .lineTo(x, pageHeight - topBottomMargin / 2)
+            .lineWidth(0.1 * PTPMM)
+            .stroke('#000');
+    }
+
+    for (const y of horizontalGuillotineMarks) {
+        doc.moveTo(0, y)
+            .lineTo(leftRightMargin / 2, y)
+            .lineWidth(0.1 * PTPMM)
+            .stroke('#000');
+
+        doc.moveTo(pageWidth, y)
+            .lineTo(pageWidth - leftRightMargin / 2, y)
+            .lineWidth(0.1 * PTPMM)
+            .stroke('#000');
+    }
+
+    doc.restore();
+}
+
 async function drawCutLines(
     doc: PDFKit.PDFDocument,
     cardX: number,
@@ -490,12 +528,29 @@ export const generatePdf = async (
         let knownFonts: { [key: string]: any } = {};
         let frontCards: { cardX: number; cardY: number; cardId: string }[] = [];
 
+        let verticalGuillotineMarks: number[] = [];
+        let horizontalGuillotineMarks: number[] = [];
+
         for (const cardId of cardsetData.cardsAllIds) {
             const cardInfo = cardsetData.cardsById[cardId];
 
             for (let idx = 0; idx < cardInfo.count; idx++) {
                 if (addNewPage) {
                     if (cardsetData.isTwoSided) {
+                        if (data.cutMarksForGuillotine) {
+                            drawCutMarksForGuillotine(
+                                doc,
+                                verticalGuillotineMarks,
+                                horizontalGuillotineMarks,
+                                pageWidth,
+                                pageHeight,
+                                leftRightMargin,
+                                topBottomMargin,
+                            );
+                            verticalGuillotineMarks = [];
+                            horizontalGuillotineMarks = [];
+                        }
+
                         doc.addPage();
                         for (const cardInfo of frontCards) {
                             let x = pageWidth - cardInfo.cardX - cardWidth;
@@ -513,10 +568,34 @@ export const generatePdf = async (
                                 cardWidth,
                                 cardHeight,
                             );
+                            verticalGuillotineMarks.push(x + (data.includeBleedingArea ? BLEED_WIDTH * PTPMM : 0));
+                            verticalGuillotineMarks.push(
+                                x + cardWidth - (data.includeBleedingArea ? BLEED_WIDTH * PTPMM : 0),
+                            );
+                            horizontalGuillotineMarks.push(y + (data.includeBleedingArea ? BLEED_WIDTH * PTPMM : 0));
+                            horizontalGuillotineMarks.push(
+                                y + cardHeight - (data.includeBleedingArea ? BLEED_WIDTH * PTPMM : 0),
+                            );
                         }
 
                         frontCards = [];
                     }
+
+                    if (data.cutMarksForGuillotine) {
+                        drawCutMarksForGuillotine(
+                            doc,
+                            verticalGuillotineMarks,
+                            horizontalGuillotineMarks,
+                            pageWidth,
+                            pageHeight,
+                            leftRightMargin,
+                            topBottomMargin,
+                        );
+
+                        verticalGuillotineMarks = [];
+                        horizontalGuillotineMarks = [];
+                    }
+
                     doc.addPage();
                     addNewPage = false;
                 }
@@ -535,6 +614,13 @@ export const generatePdf = async (
                     cardHeight,
                 );
 
+                verticalGuillotineMarks.push(cardX + (data.includeBleedingArea ? BLEED_WIDTH * PTPMM : 0));
+                verticalGuillotineMarks.push(cardX + cardWidth - (data.includeBleedingArea ? BLEED_WIDTH * PTPMM : 0));
+                horizontalGuillotineMarks.push(cardY + (data.includeBleedingArea ? BLEED_WIDTH * PTPMM : 0));
+                horizontalGuillotineMarks.push(
+                    cardY + cardHeight - (data.includeBleedingArea ? BLEED_WIDTH * PTPMM : 0),
+                );
+
                 // Get next card position
                 cardX += cardWidth + verticalSpace;
                 if (cardX + cardWidth > pageWidth - leftRightMargin) {
@@ -549,6 +635,21 @@ export const generatePdf = async (
         }
 
         if (cardsetData.isTwoSided && frontCards.length > 0) {
+            if (data.cutMarksForGuillotine) {
+                drawCutMarksForGuillotine(
+                    doc,
+                    verticalGuillotineMarks,
+                    horizontalGuillotineMarks,
+                    pageWidth,
+                    pageHeight,
+                    leftRightMargin,
+                    topBottomMargin,
+                );
+
+                verticalGuillotineMarks = [];
+                horizontalGuillotineMarks = [];
+            }
+
             doc.addPage();
             for (const cardInfo of frontCards) {
                 let x = pageWidth - cardInfo.cardX - cardWidth;
@@ -566,6 +667,26 @@ export const generatePdf = async (
                     cardWidth,
                     cardHeight,
                 );
+
+                verticalGuillotineMarks.push(x + (data.includeBleedingArea ? BLEED_WIDTH * PTPMM : 0));
+                verticalGuillotineMarks.push(x + cardWidth - (data.includeBleedingArea ? BLEED_WIDTH * PTPMM : 0));
+                horizontalGuillotineMarks.push(y + (data.includeBleedingArea ? BLEED_WIDTH * PTPMM : 0));
+                horizontalGuillotineMarks.push(y + cardHeight - (data.includeBleedingArea ? BLEED_WIDTH * PTPMM : 0));
+            }
+
+            if (data.cutMarksForGuillotine) {
+                drawCutMarksForGuillotine(
+                    doc,
+                    verticalGuillotineMarks,
+                    horizontalGuillotineMarks,
+                    pageWidth,
+                    pageHeight,
+                    leftRightMargin,
+                    topBottomMargin,
+                );
+
+                verticalGuillotineMarks = [];
+                horizontalGuillotineMarks = [];
             }
         }
 
