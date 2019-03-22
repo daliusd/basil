@@ -8,8 +8,12 @@ const { SVGPathData } = require('svg-pathdata');
 
 import { XmlDocument, XmlNode, XmlTextNode, XmlElement } from 'xmldoc';
 
+// XXX: Careful! Code duplication here. If you change types or constants in saffron then change here as well.
+
+// Constants
+export const BLEED_WIDTH = 25.4 / 8; // 1/8th of inch in mm
+
 // Types
-// XXX: Careful! Code duplication here. If you change types in saffron changes types here as well
 
 export interface CardType {
     id: string;
@@ -269,6 +273,11 @@ async function drawCard(
     const cardImages = data.images[cardId];
     const cardTexts = data.texts[cardId];
 
+    doc.save();
+
+    doc.rect(cardX, cardY, cardWidth, cardHeight).clip();
+    doc.translate(-BLEED_WIDTH * PTPMM, -BLEED_WIDTH * PTPMM);
+
     for (const placeholderId of data.placeholdersAllIds) {
         const placeholder = data.placeholders[placeholderId];
         if ((placeholder.isOnBack || false) !== isBack) {
@@ -392,6 +401,8 @@ async function drawCard(
             doc.restore();
         }
     }
+
+    doc.restore();
 
     await drawCutLines(doc, cardX, cardY, cardWidth, cardHeight);
 }
