@@ -484,12 +484,30 @@ export const generatePdf = async (
     callback: () => void,
 ) => {
     try {
-        let resp = await makeAuthRequest(
-            `${serverUrl}/api/${data.collectionType}/${data.collectionId}`,
-            data.accessToken,
-        );
-        let cardsetData: CardSetData = JSON.parse(resp.data.data);
+        let cardsets: CardSetData[] = [];
 
+        // Get Card Sets
+        if (data.collectionType === 'games') {
+            let resp = await makeAuthRequest(
+                `${serverUrl}/api/${data.collectionType}/${data.collectionId}`,
+                data.accessToken,
+            );
+            const cardsetsList = resp.data.cardsets;
+            for (const cardsetInfo of cardsetsList) {
+                resp = await makeAuthRequest(`${serverUrl}/api/cardsets/${cardsetInfo.id}`, data.accessToken);
+                let cardsetData: CardSetData = JSON.parse(resp.data.data);
+                cardsets.push(cardsetData);
+            }
+        } else {
+            let resp = await makeAuthRequest(
+                `${serverUrl}/api/${data.collectionType}/${data.collectionId}`,
+                data.accessToken,
+            );
+            let cardsetData: CardSetData = JSON.parse(resp.data.data);
+            cardsets.push(cardsetData);
+        }
+
+        // Prepare job data
         const doc = new PDFDocument({
             size: [data.pageWidth * PTPMM, data.pageHeight * PTPMM],
             info: {
@@ -500,18 +518,6 @@ export const generatePdf = async (
 
         const stream = doc.pipe(outStream);
 
-        if (data.topBottomMargin * 2 + cardsetData.height > data.pageHeight) {
-            throw new Error(
-                'Cards do not fit in the page (height and margins are larger then page height). Reduce margins or card size.',
-            );
-        }
-
-        if (data.leftRightMargin * 2 + cardsetData.width > data.pageWidth) {
-            throw new Error(
-                'Cards do not fit in the page (width and margins are larger then page width). Reduce margins or card size.',
-            );
-        }
-
         const pageWidth = data.pageWidth * PTPMM;
         const pageHeight = data.pageHeight * PTPMM;
         const leftRightMargin = data.leftRightMargin * PTPMM;
@@ -519,24 +525,107 @@ export const generatePdf = async (
         const verticalSpace = data.verticalSpace * PTPMM;
         const horizontalSpace = data.horizontalSpace * PTPMM;
 
-        const cardWidth = (cardsetData.width + (data.includeBleedingArea ? BLEED_WIDTH * 2 : 0)) * PTPMM;
-        const cardHeight = (cardsetData.height + (data.includeBleedingArea ? BLEED_WIDTH * 2 : 0)) * PTPMM;
+        const isTwoSided = cardsets.map(cs => cs.isTwoSided).reduce((a, b) => a || b, false);
 
         let cardX = leftRightMargin;
         let cardY = topBottomMargin;
+        let prevCardWidth = 0;
+        let prevCardHeight = 0;
         let addNewPage = false;
         let knownFonts: { [key: string]: any } = {};
-        let frontCards: { cardX: number; cardY: number; cardId: string }[] = [];
+        let frontCards: {
+            cardX: number;
+            cardY: number;
+            cardWidth: number;
+            cardHeight: number;
+            cardId: string;
+            cardsetData: CardSetData;
+        }[] = [];
 
         let verticalGuillotineMarks: number[] = [];
         let horizontalGuillotineMarks: number[] = [];
 
-        for (const cardId of cardsetData.cardsAllIds) {
-            const cardInfo = cardsetData.cardsById[cardId];
+        for (const cardsetData of cardsets) {
+            if (data.topBottomMargin * 2 + cardsetData.height > data.pageHeight) {
+                throw new Error(
+                    'Cards do not fit in the page (height and margins are larger then page height). Reduce margins or card size.',
+                );
+            }
 
-            for (let idx = 0; idx < cardInfo.count; idx++) {
-                if (addNewPage) {
-                    if (cardsetData.isTwoSided) {
+            if (data.leftRightMargin * 2 + cardsetData.width > data.pageWidth) {
+                throw new Error(
+                    'Cards do not fit in the page (width and margins are larger then page width). Reduce margins or card size.',
+                );
+            }
+
+            const cardWidth = (cardsetData.width + (data.includeBleedingArea ? BLEED_WIDTH * 2 : 0)) * PTPMM;
+            const cardHeight = (cardsetData.height + (data.includeBleedingArea ? BLEED_WIDTH * 2 : 0)) * PTPMM;
+
+            if (
+                prevCardHeight !== 0 &&
+                prevCardWidth !== 0 &&
+                (prevCardHeight !== cardHeight || prevCardWidth !== cardWidth)
+            ) {
+                addNewPage = true;
+                cardX = leftRightMargin;
+                cardY = topBottomMargin;
+            }
+
+            prevCardHeight = cardHeight;
+            prevCardWidth = cardWidth;
+
+            for (const cardId of cardsetData.cardsAllIds) {
+                const cardInfo = cardsetData.cardsById[cardId];
+
+                for (let idx = 0; idx < cardInfo.count; idx++) {
+                    if (addNewPage) {
+                        if (isTwoSided) {
+                            if (data.cutMarksForGuillotine) {
+                                drawCutMarksForGuillotine(
+                                    doc,
+                                    verticalGuillotineMarks,
+                                    horizontalGuillotineMarks,
+                                    pageWidth,
+                                    pageHeight,
+                                    leftRightMargin,
+                                    topBottomMargin,
+                                );
+                                verticalGuillotineMarks = [];
+                                horizontalGuillotineMarks = [];
+                            }
+
+                            doc.addPage();
+                            for (const cardInfo of frontCards) {
+                                let x = pageWidth - cardInfo.cardX - cardWidth;
+                                let y = cardInfo.cardY;
+                                await drawCard(
+                                    doc,
+                                    cardInfo.cardsetData,
+                                    data,
+                                    serverUrl,
+                                    knownFonts,
+                                    true,
+                                    cardInfo.cardId,
+                                    x,
+                                    y,
+                                    cardWidth,
+                                    cardHeight,
+                                );
+                                verticalGuillotineMarks.push(x + (data.includeBleedingArea ? BLEED_WIDTH * PTPMM : 0));
+                                verticalGuillotineMarks.push(
+                                    x + cardWidth - (data.includeBleedingArea ? BLEED_WIDTH * PTPMM : 0),
+                                );
+                                horizontalGuillotineMarks.push(
+                                    y + (data.includeBleedingArea ? BLEED_WIDTH * PTPMM : 0),
+                                );
+                                horizontalGuillotineMarks.push(
+                                    y + cardHeight - (data.includeBleedingArea ? BLEED_WIDTH * PTPMM : 0),
+                                );
+                            }
+
+                            frontCards = [];
+                        }
+
                         if (data.cutMarksForGuillotine) {
                             drawCutMarksForGuillotine(
                                 doc,
@@ -547,94 +636,53 @@ export const generatePdf = async (
                                 leftRightMargin,
                                 topBottomMargin,
                             );
+
                             verticalGuillotineMarks = [];
                             horizontalGuillotineMarks = [];
                         }
 
                         doc.addPage();
-                        for (const cardInfo of frontCards) {
-                            let x = pageWidth - cardInfo.cardX - cardWidth;
-                            let y = cardInfo.cardY;
-                            await drawCard(
-                                doc,
-                                cardsetData,
-                                data,
-                                serverUrl,
-                                knownFonts,
-                                true,
-                                cardInfo.cardId,
-                                x,
-                                y,
-                                cardWidth,
-                                cardHeight,
-                            );
-                            verticalGuillotineMarks.push(x + (data.includeBleedingArea ? BLEED_WIDTH * PTPMM : 0));
-                            verticalGuillotineMarks.push(
-                                x + cardWidth - (data.includeBleedingArea ? BLEED_WIDTH * PTPMM : 0),
-                            );
-                            horizontalGuillotineMarks.push(y + (data.includeBleedingArea ? BLEED_WIDTH * PTPMM : 0));
-                            horizontalGuillotineMarks.push(
-                                y + cardHeight - (data.includeBleedingArea ? BLEED_WIDTH * PTPMM : 0),
-                            );
+                        addNewPage = false;
+                    }
+                    frontCards.push({ cardX, cardY, cardWidth, cardHeight, cardId, cardsetData });
+                    await drawCard(
+                        doc,
+                        cardsetData,
+                        data,
+                        serverUrl,
+                        knownFonts,
+                        false,
+                        cardId,
+                        cardX,
+                        cardY,
+                        cardWidth,
+                        cardHeight,
+                    );
+
+                    verticalGuillotineMarks.push(cardX + (data.includeBleedingArea ? BLEED_WIDTH * PTPMM : 0));
+                    verticalGuillotineMarks.push(
+                        cardX + cardWidth - (data.includeBleedingArea ? BLEED_WIDTH * PTPMM : 0),
+                    );
+                    horizontalGuillotineMarks.push(cardY + (data.includeBleedingArea ? BLEED_WIDTH * PTPMM : 0));
+                    horizontalGuillotineMarks.push(
+                        cardY + cardHeight - (data.includeBleedingArea ? BLEED_WIDTH * PTPMM : 0),
+                    );
+
+                    // Get next card position
+                    cardX += cardWidth + verticalSpace;
+                    if (cardX + cardWidth > pageWidth - leftRightMargin) {
+                        cardX = leftRightMargin;
+                        cardY += cardHeight + horizontalSpace;
+                        if (cardY + cardHeight > pageHeight - topBottomMargin) {
+                            cardY = topBottomMargin;
+                            addNewPage = true;
                         }
-
-                        frontCards = [];
-                    }
-
-                    if (data.cutMarksForGuillotine) {
-                        drawCutMarksForGuillotine(
-                            doc,
-                            verticalGuillotineMarks,
-                            horizontalGuillotineMarks,
-                            pageWidth,
-                            pageHeight,
-                            leftRightMargin,
-                            topBottomMargin,
-                        );
-
-                        verticalGuillotineMarks = [];
-                        horizontalGuillotineMarks = [];
-                    }
-
-                    doc.addPage();
-                    addNewPage = false;
-                }
-                frontCards.push({ cardX, cardY, cardId });
-                await drawCard(
-                    doc,
-                    cardsetData,
-                    data,
-                    serverUrl,
-                    knownFonts,
-                    false,
-                    cardId,
-                    cardX,
-                    cardY,
-                    cardWidth,
-                    cardHeight,
-                );
-
-                verticalGuillotineMarks.push(cardX + (data.includeBleedingArea ? BLEED_WIDTH * PTPMM : 0));
-                verticalGuillotineMarks.push(cardX + cardWidth - (data.includeBleedingArea ? BLEED_WIDTH * PTPMM : 0));
-                horizontalGuillotineMarks.push(cardY + (data.includeBleedingArea ? BLEED_WIDTH * PTPMM : 0));
-                horizontalGuillotineMarks.push(
-                    cardY + cardHeight - (data.includeBleedingArea ? BLEED_WIDTH * PTPMM : 0),
-                );
-
-                // Get next card position
-                cardX += cardWidth + verticalSpace;
-                if (cardX + cardWidth > pageWidth - leftRightMargin) {
-                    cardX = leftRightMargin;
-                    cardY += cardHeight + horizontalSpace;
-                    if (cardY + cardHeight > pageHeight - topBottomMargin) {
-                        cardY = topBottomMargin;
-                        addNewPage = true;
                     }
                 }
             }
         }
 
-        if (cardsetData.isTwoSided && frontCards.length > 0) {
+        if (isTwoSided && frontCards.length > 0) {
             if (data.cutMarksForGuillotine) {
                 drawCutMarksForGuillotine(
                     doc,
@@ -652,11 +700,11 @@ export const generatePdf = async (
 
             doc.addPage();
             for (const cardInfo of frontCards) {
-                let x = pageWidth - cardInfo.cardX - cardWidth;
+                let x = pageWidth - cardInfo.cardX - cardInfo.cardWidth;
                 let y = cardInfo.cardY;
                 await drawCard(
                     doc,
-                    cardsetData,
+                    cardInfo.cardsetData,
                     data,
                     serverUrl,
                     knownFonts,
@@ -664,14 +712,18 @@ export const generatePdf = async (
                     cardInfo.cardId,
                     x,
                     y,
-                    cardWidth,
-                    cardHeight,
+                    cardInfo.cardWidth,
+                    cardInfo.cardHeight,
                 );
 
                 verticalGuillotineMarks.push(x + (data.includeBleedingArea ? BLEED_WIDTH * PTPMM : 0));
-                verticalGuillotineMarks.push(x + cardWidth - (data.includeBleedingArea ? BLEED_WIDTH * PTPMM : 0));
+                verticalGuillotineMarks.push(
+                    x + cardInfo.cardWidth - (data.includeBleedingArea ? BLEED_WIDTH * PTPMM : 0),
+                );
                 horizontalGuillotineMarks.push(y + (data.includeBleedingArea ? BLEED_WIDTH * PTPMM : 0));
-                horizontalGuillotineMarks.push(y + cardHeight - (data.includeBleedingArea ? BLEED_WIDTH * PTPMM : 0));
+                horizontalGuillotineMarks.push(
+                    y + cardInfo.cardHeight - (data.includeBleedingArea ? BLEED_WIDTH * PTPMM : 0),
+                );
             }
 
             if (data.cutMarksForGuillotine) {

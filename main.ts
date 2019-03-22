@@ -11,7 +11,7 @@ const generatePdfForSample = async (username: string, password: string) => {
         const accessToken = resp.data['accessToken'];
 
         const data: JobData = {
-            collectionType: 'cardsets',
+            collectionType: 'games',
             collectionId: '2',
             pageWidth: 210,
             pageHeight: 297,
