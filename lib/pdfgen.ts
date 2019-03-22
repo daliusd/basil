@@ -95,6 +95,8 @@ export interface JobData {
     verticalSpace: number;
     horizontalSpace: number;
     includeBleedingArea: boolean;
+    cutMarksForScissors: boolean;
+    cutMarksForGuillotine: boolean;
 }
 
 export interface CardSetData {
@@ -278,6 +280,7 @@ async function drawCutLines(
 async function drawCard(
     doc: PDFKit.PDFDocument,
     data: CardSetData,
+    jobData: JobData,
     serverUrl: string,
     knownFonts: { [key: string]: any },
     isBack: boolean,
@@ -286,7 +289,6 @@ async function drawCard(
     cardY: number,
     cardWidth: number,
     cardHeight: number,
-    includeBleedingArea: boolean,
 ) {
     const cardImages = data.images[cardId];
     const cardTexts = data.texts[cardId];
@@ -294,7 +296,7 @@ async function drawCard(
     doc.save();
 
     doc.rect(cardX, cardY, cardWidth, cardHeight).clip();
-    if (!includeBleedingArea) {
+    if (!jobData.includeBleedingArea) {
         doc.translate(-BLEED_WIDTH * PTPMM, -BLEED_WIDTH * PTPMM);
     }
 
@@ -424,13 +426,15 @@ async function drawCard(
 
     doc.restore();
 
-    await drawCutLines(
-        doc,
-        cardX + (includeBleedingArea ? BLEED_WIDTH * PTPMM : 0),
-        cardY + (includeBleedingArea ? BLEED_WIDTH * PTPMM : 0),
-        cardWidth - (includeBleedingArea ? BLEED_WIDTH * 2 * PTPMM : 0),
-        cardHeight - (includeBleedingArea ? BLEED_WIDTH * 2 * PTPMM : 0),
-    );
+    if (jobData.cutMarksForScissors) {
+        await drawCutLines(
+            doc,
+            cardX + (jobData.includeBleedingArea ? BLEED_WIDTH * PTPMM : 0),
+            cardY + (jobData.includeBleedingArea ? BLEED_WIDTH * PTPMM : 0),
+            cardWidth - (jobData.includeBleedingArea ? BLEED_WIDTH * 2 * PTPMM : 0),
+            cardHeight - (jobData.includeBleedingArea ? BLEED_WIDTH * 2 * PTPMM : 0),
+        );
+    }
 }
 
 // PDF generation
@@ -499,6 +503,7 @@ export const generatePdf = async (
                             await drawCard(
                                 doc,
                                 cardsetData,
+                                data,
                                 serverUrl,
                                 knownFonts,
                                 true,
@@ -507,7 +512,6 @@ export const generatePdf = async (
                                 y,
                                 cardWidth,
                                 cardHeight,
-                                data.includeBleedingArea,
                             );
                         }
 
@@ -520,6 +524,7 @@ export const generatePdf = async (
                 await drawCard(
                     doc,
                     cardsetData,
+                    data,
                     serverUrl,
                     knownFonts,
                     false,
@@ -528,7 +533,6 @@ export const generatePdf = async (
                     cardY,
                     cardWidth,
                     cardHeight,
-                    data.includeBleedingArea,
                 );
 
                 // Get next card position
@@ -552,6 +556,7 @@ export const generatePdf = async (
                 await drawCard(
                     doc,
                     cardsetData,
+                    data,
                     serverUrl,
                     knownFonts,
                     true,
@@ -560,7 +565,6 @@ export const generatePdf = async (
                     y,
                     cardWidth,
                     cardHeight,
-                    data.includeBleedingArea,
                 );
             }
         }
