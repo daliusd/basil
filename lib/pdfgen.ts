@@ -19,21 +19,48 @@ export const BLEED_WIDTH = 25.4 / 8; // 1/8th of inch in mm
 
 const PTPMM = 72 / 25.4;
 
+const BOLD_MAP: Record<string, string[]> = {
+    '100': ['regular', '300', '500', '200', '600', '700', '800', '900'],
+    '200': ['500', 'regular', '300', '600', '700', '800', '900'],
+    '300': ['600', '500', '700', 'regular', '800', '900'],
+    regular: ['700', '600', '800', '500', '900'],
+    '500': ['800', '700', '900', '600'],
+    '600': ['900', '800', '700'],
+    '700': ['900', '800'],
+    '800': ['900'],
+    '900': ['900'],
+};
+
+const ITALIC_MAP: Record<string, string> = {
+    '100': '100italic',
+    '200': '200italic',
+    '300': '300italic',
+    regular: 'italic',
+    '500': '500italic',
+    '600': '600italic',
+    '700': '700italic',
+    '800': '800italic',
+    '900': '900italic',
+};
+
 // Text drawing
 interface TextSlice {
     text: string;
     color: string;
+    bold: boolean;
+    italic: boolean;
 }
 
 interface TextOptions {
-    font: any;
+    fontFamily: string;
+    fontVariant: string;
     fontSize: number;
     lineHeight: number;
     align: string;
     width: number;
     height: number;
-    ascent: number;
-    scale: number;
+    bold: boolean;
+    italic: boolean;
 }
 
 interface TextLineGlyph {
@@ -68,11 +95,50 @@ export class PDFGenerator {
         return flipped;
     }
 
-    drawTextLine(textLine: TextLineGlyph[], textOptions: TextOptions) {
+    async getFont(to: TextOptions) {
+        const fontName = `${to.fontFamily}:${to.fontVariant}:${to.bold}:${to.italic}`;
+
+        if (!(fontName in this.knownFonts)) {
+            const webFont = webFonts[to.fontFamily];
+
+            let fontVariant = to.fontVariant;
+            if (to.bold) {
+                for (const variant of BOLD_MAP[fontVariant]) {
+                    if (variant in webFont) {
+                        fontVariant = variant;
+                    }
+                }
+            }
+
+            if (to.italic) {
+                if (ITALIC_MAP[fontVariant] in webFont) {
+                    fontVariant = ITALIC_MAP[fontVariant];
+                }
+            }
+
+            let fontUrl = webFont[fontVariant];
+
+            fontUrl = fontUrl.replace('http://', 'https://');
+            var arrayBuffer = await this.makeRequest(fontUrl);
+            const buf = buffer.Buffer.from(arrayBuffer.data);
+
+            let font = fontkit.create(buf);
+            this.knownFonts[fontName] = font;
+        }
+
+        return this.knownFonts[fontName];
+    }
+
+    async drawTextLine(textLine: TextLineGlyph[], textOptions: TextOptions) {
         const lineWidth = textLine.map(l => l.advanceWidth).reduce((a, b) => a + b, 0);
 
+        const font = await this.getFont(textOptions);
+        const fontHeight = (font.hhea.ascent - font.hhea.descent) / font.head.unitsPerEm;
+        const addOn = (textOptions.lineHeight - fontHeight) / 2;
+        const ascent = (addOn + font.hhea.ascent / font.head.unitsPerEm) * textOptions.fontSize;
+
         this.doc.save();
-        this.doc.translate(0, textOptions.ascent);
+        this.doc.translate(0, ascent);
 
         if (textOptions.align === 'center') {
             this.doc.translate((textOptions.width - lineWidth) / 2, 0);
@@ -80,11 +146,14 @@ export class PDFGenerator {
             this.doc.translate(textOptions.width - lineWidth, 0);
         }
 
+        const scale = (1.0 / font.head.unitsPerEm) * textOptions.fontSize;
+
         for (const tlg of textLine) {
             this.doc.fillColor(tlg.color);
 
             this.doc.save();
-            this.doc.scale(textOptions.scale, textOptions.scale);
+
+            this.doc.scale(scale, scale);
             const flipped = this.flip(tlg.glyph.path.toSVG());
             this.doc.path(flipped).fill();
             this.doc.restore();
@@ -95,20 +164,22 @@ export class PDFGenerator {
         this.doc.restore();
     }
 
-    drawTextSlices(textSlices: TextSlice[], textOptions: TextOptions) {
-        const joinedText = textSlices.map(ts => ts.text).join('');
-        let run = textOptions.font.layout(joinedText);
+    async drawTextSliceBlock(
+        lineToDraw: TextLineGlyph[],
+        lineWidth: number,
+        joinedText: { chr: string; textSlice: TextSlice }[],
+        textOptions: TextOptions,
+    ): Promise<{ lineToDraw: TextLineGlyph[]; lineWidth: number }> {
+        const font = await this.getFont(textOptions);
+        let run = font.layout(joinedText.map(i => i.chr).join(''));
 
-        let lineToDraw: TextLineGlyph[] = [];
-        let lineWidth = 0;
-        let sliceNo = 0;
         let charNo = 0;
         let lastSpace = -1;
         for (let glyph of run.glyphs) {
-            let advanceWidth = (glyph.advanceWidth / textOptions.font.head.unitsPerEm) * textOptions.fontSize;
+            let advanceWidth = (glyph.advanceWidth / font.head.unitsPerEm) * textOptions.fontSize;
 
-            lineToDraw.push({ glyph, color: textSlices[sliceNo].color, advanceWidth });
-            if (lineToDraw.length > 1 && textSlices[sliceNo].text[charNo] === ' ') {
+            lineToDraw.push({ glyph, color: joinedText[charNo].textSlice.color, advanceWidth });
+            if (lineToDraw.length > 1 && joinedText[charNo].chr === ' ') {
                 lastSpace = lineToDraw.length - 1;
             }
 
@@ -122,7 +193,7 @@ export class PDFGenerator {
                     partToDraw = lineToDraw.splice(0, lineToDraw.length - 1);
                 }
 
-                this.drawTextLine(partToDraw, textOptions);
+                await this.drawTextLine(partToDraw, textOptions);
                 lineWidth = lineToDraw.map(l => l.advanceWidth).reduce((a, b) => a + b, 0);
                 lastSpace = -1;
 
@@ -130,18 +201,64 @@ export class PDFGenerator {
             }
 
             charNo++;
-            if (charNo >= textSlices[sliceNo].text.length) {
-                charNo = 0;
-                sliceNo++;
-            }
         }
+
+        return { lineToDraw, lineWidth };
+    }
+
+    async drawTextSlices(textSlices: TextSlice[], textOptions: TextOptions) {
+        if (textSlices.length === 0) {
+            return;
+        }
+
+        let currentBold = textSlices[0].bold;
+        let currentItalic = textSlices[0].italic;
+        let currentSlice = 0;
+        let joinedText: { chr: string; textSlice: TextSlice }[] = [];
+
+        let lineToDraw: TextLineGlyph[] = [];
+        let lineWidth = 0;
+
+        for (let idx = 0; idx < textSlices.length; idx++) {
+            const textSlice = textSlices[idx];
+
+            if (currentBold !== textSlice.bold || currentItalic !== textSlice.italic) {
+                let result = await this.drawTextSliceBlock(lineToDraw, lineWidth, joinedText, {
+                    ...textOptions,
+                    bold: currentBold,
+                    italic: currentItalic,
+                });
+
+                lineToDraw = result.lineToDraw;
+                lineWidth = result.lineWidth;
+
+                currentBold = textSlice.bold;
+                currentItalic = textSlice.italic;
+                joinedText = [];
+            }
+            for (const chr of textSlice.text) {
+                joinedText.push({ chr, textSlice });
+            }
+            currentSlice += 1;
+        }
+
+        if (joinedText.length > 0) {
+            let result = await this.drawTextSliceBlock(lineToDraw, lineWidth, joinedText, {
+                ...textOptions,
+                bold: currentBold,
+                italic: currentItalic,
+            });
+            lineToDraw = result.lineToDraw;
+            lineWidth = result.lineWidth;
+        }
+
         if (lineToDraw.length > 0) {
-            this.drawTextLine(lineToDraw, textOptions);
+            await this.drawTextLine(lineToDraw, textOptions);
             this.doc.translate(0, textOptions.fontSize * textOptions.lineHeight); // Move cursor one text line down
         }
     }
 
-    drawText(node: HTMLElement, color: string, textOptions: TextOptions): TextSlice[] {
+    async drawText(node: HTMLElement, color: string, textOptions: TextOptions): Promise<TextSlice[]> {
         let textSlices: TextSlice[] = [];
         if (node.nodeType !== NodeType.ELEMENT_NODE) {
             return [];
@@ -149,19 +266,32 @@ export class PDFGenerator {
 
         for (const child of node.childNodes) {
             if (child.nodeType === NodeType.TEXT_NODE) {
-                textSlices.push({ text: child.text, color });
+                textSlices.push({ text: child.text, color, bold: textOptions.bold, italic: textOptions.italic });
             } else if (child.nodeType === NodeType.ELEMENT_NODE) {
                 const element = child as HTMLElement;
                 let newColor = color;
                 if (element.tagName === 'font' && 'color' in element.attributes) {
                     newColor = element.attributes['color'];
                 }
-                textSlices = [...textSlices, ...this.drawText(element, newColor, textOptions)];
+                const newTextOptions = { ...textOptions };
+                if (element.tagName === 'b') {
+                    newTextOptions.bold = true;
+                }
+                if (element.tagName === 'i') {
+                    newTextOptions.italic = true;
+                }
+
+                if (element.tagName === 'div') {
+                    await this.drawTextSlices(textSlices, textOptions);
+                    textSlices = await this.drawText(element, newColor, newTextOptions);
+                } else {
+                    textSlices = [...textSlices, ...(await this.drawText(element, newColor, newTextOptions))];
+                }
             }
         }
 
         if (node.tagName === 'div') {
-            this.drawTextSlices(textSlices, textOptions);
+            await this.drawTextSlices(textSlices, textOptions);
             return [];
         }
         return textSlices;
@@ -329,39 +459,20 @@ export class PDFGenerator {
                 this.doc.rotate((placeholder.angle * 180) / Math.PI);
                 this.doc.translate((-placeholder.width / 2) * PTPMM, (-placeholder.height / 2) * PTPMM);
 
-                const fontName = `${placeholder.fontFamily}:${placeholder.fontVariant}`;
-                if (
-                    !(fontName in this.knownFonts) &&
-                    placeholder.fontFamily in webFonts &&
-                    placeholder.fontVariant in webFonts[placeholder.fontFamily]
-                ) {
-                    let fontUrl = webFonts[placeholder.fontFamily][placeholder.fontVariant];
-                    fontUrl = fontUrl.replace('http://', 'https://');
-                    var arrayBuffer = await this.makeRequest(fontUrl);
-                    const buf = buffer.Buffer.from(arrayBuffer.data);
-
-                    let font = fontkit.create(buf);
-                    this.knownFonts[fontName] = font;
-                }
-
-                let font = this.knownFonts[fontName];
-
                 let fontSize = placeholder.fontSize * PTPMM;
 
-                const fontHeight = (font.hhea.ascent - font.hhea.descent) / font.head.unitsPerEm;
-                const addOn = ((placeholder.lineHeight || 1.27) - fontHeight) / 2;
-
                 const textOptions: TextOptions = {
-                    font,
+                    fontFamily: placeholder.fontFamily,
+                    fontVariant: placeholder.fontVariant,
                     fontSize,
                     lineHeight: placeholder.lineHeight || 1.27,
                     align: placeholder.align,
                     width: placeholder.width * PTPMM,
                     height: placeholder.height * PTPMM,
-                    ascent: (addOn + font.hhea.ascent / font.head.unitsPerEm) * fontSize,
-                    scale: (1.0 / font.head.unitsPerEm) * fontSize,
+                    bold: false,
+                    italic: false,
                 };
-                this.drawText(parsedText as HTMLElement, placeholder.color, textOptions);
+                await this.drawText(parsedText as HTMLElement, placeholder.color, textOptions);
 
                 this.doc.restore();
             }
