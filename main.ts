@@ -1,7 +1,10 @@
-import * as fs from 'fs';
-import { JobData, generatePdf } from './lib/pdfgen';
-import * as yargs from 'yargs';
 import axios from 'axios';
+import * as yargs from 'yargs';
+
+import * as fs from 'fs';
+
+import { JobData } from './lib/types';
+import { PDFGenerator } from './lib/pdfgen';
 
 const SERVER = 'http://localhost:5000';
 
@@ -12,7 +15,7 @@ const generatePdfForSample = async (username: string, password: string) => {
 
         const data: JobData = {
             collectionType: 'games',
-            collectionId: '2',
+            collectionId: '26',
             pageWidth: 210,
             pageHeight: 297,
             topBottomMargin: 15,
@@ -26,7 +29,7 @@ const generatePdfForSample = async (username: string, password: string) => {
         };
 
         const stream = fs.createWriteStream('output.pdf');
-        generatePdf(data, SERVER, stream, () => {
+        new PDFGenerator().generatePdf(data, SERVER, stream, () => {
             console.log('finished');
         });
     } catch (err) {
