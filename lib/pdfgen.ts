@@ -282,7 +282,19 @@ export class PDFGenerator {
                 }
 
                 if (element.tagName === 'div') {
+                    // Draw text before this div
                     await this.drawTextSlices(textSlices, textOptions);
+
+                    if ('align' in element.attributes) {
+                        newTextOptions.align = element.attributes['align'];
+                    } else if ('style' in element.attributes) {
+                        if (element.attributes['style'] === 'text-align: right;') {
+                            newTextOptions.align = 'right';
+                        } else if (element.attributes['style'] === 'text-align: center;') {
+                            newTextOptions.align = 'center';
+                        }
+                    }
+
                     textSlices = await this.drawText(element, newColor, newTextOptions);
                 } else {
                     textSlices = [...textSlices, ...(await this.drawText(element, newColor, newTextOptions))];
