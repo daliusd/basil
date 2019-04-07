@@ -44,12 +44,24 @@ const ITALIC_MAP: Record<string, string> = {
 };
 
 // Text drawing
+interface TextObjectBase {
+    type: string;
+}
+
 interface TextSlice {
+    type: 'slice';
     text: string;
     color: string;
     bold: boolean;
     italic: boolean;
 }
+
+interface ImageInText {
+    type: 'image';
+    url: string;
+}
+
+type TextObject = TextSlice | ImageInText;
 
 interface TextOptions {
     fontFamily: string;
@@ -151,12 +163,30 @@ export class PDFGenerator {
         for (const tlg of textLine) {
             this.doc.fillColor(tlg.color);
 
-            this.doc.save();
+            if (!tlg.glyph.url) {
+                this.doc.save();
+                this.doc.scale(scale, scale);
+                const flipped = this.flip(tlg.glyph.path.toSVG());
+                this.doc.path(flipped).fill();
+                this.doc.restore();
+            } else {
+                this.doc.save();
+                this.doc.translate(0, -textOptions.fontSize);
 
-            this.doc.scale(scale, scale);
-            const flipped = this.flip(tlg.glyph.path.toSVG());
-            this.doc.path(flipped).fill();
-            this.doc.restore();
+                let resp = await this.makeRequest(tlg.glyph.url);
+                const buf = buffer.Buffer.from(resp.data);
+
+                if (resp.headers['content-type'] === 'image/svg+xml') {
+                    SVGtoPDF(this.doc, buf.toString(), 0, 0, {
+                        width: textOptions.fontSize,
+                        height: textOptions.fontSize,
+                    });
+                } else {
+                    this.doc.image(buf, 0, 0, { height: textOptions.fontSize });
+                }
+
+                this.doc.restore();
+            }
 
             this.doc.translate(tlg.advanceWidth, 0);
         }
@@ -167,19 +197,38 @@ export class PDFGenerator {
     async drawTextSliceBlock(
         lineToDraw: TextLineGlyph[],
         lineWidth: number,
-        joinedText: { chr: string; textSlice: TextSlice }[],
+        joinedObjects: { chr: string; textObject: TextObject }[],
         textOptions: TextOptions,
     ): Promise<{ lineToDraw: TextLineGlyph[]; lineWidth: number }> {
+        if (joinedObjects.length === 0) {
+            return { lineToDraw, lineWidth };
+        }
+
         const font = await this.getFont(textOptions);
-        let run = font.layout(joinedText.map(i => i.chr).join(''));
+        let glyphs = [];
+        if (joinedObjects[0].textObject.type === 'slice') {
+            let run = font.layout(joinedObjects.map(i => i.chr).join(''));
+            glyphs = run.glyphs;
+        } else if (joinedObjects[0].textObject.type === 'image') {
+            for (const obj of joinedObjects) {
+                if (obj.textObject.type === 'image') {
+                    glyphs.push({
+                        url: obj.textObject.url,
+                        advanceWidth: font.head.unitsPerEm,
+                    });
+                }
+            }
+        }
 
         let charNo = 0;
         let lastSpace = -1;
-        for (let glyph of run.glyphs) {
+        for (let glyph of glyphs) {
             let advanceWidth = (glyph.advanceWidth / font.head.unitsPerEm) * textOptions.fontSize;
 
-            lineToDraw.push({ glyph, color: joinedText[charNo].textSlice.color, advanceWidth });
-            if (lineToDraw.length > 1 && joinedText[charNo].chr === ' ') {
+            const obj = joinedObjects[charNo].textObject;
+            lineToDraw.push({ glyph, color: obj.type === 'slice' ? obj.color : '#000000', advanceWidth });
+
+            if (lineToDraw.length > 1 && joinedObjects[charNo].chr === ' ') {
                 lastSpace = lineToDraw.length - 1;
             }
 
@@ -206,24 +255,33 @@ export class PDFGenerator {
         return { lineToDraw, lineWidth };
     }
 
-    async drawTextSlices(textSlices: TextSlice[], textOptions: TextOptions) {
-        if (textSlices.length === 0) {
+    async drawTextObjects(textObjects: TextObject[], textOptions: TextOptions) {
+        if (textObjects.length === 0) {
             return;
         }
 
-        let currentBold = textSlices[0].bold;
-        let currentItalic = textSlices[0].italic;
-        let currentSlice = 0;
-        let joinedText: { chr: string; textSlice: TextSlice }[] = [];
+        let currentBold = false;
+        let currentItalic = false;
+        let currentType = 'slice';
+        let joinedObjects: { chr: string; textObject: TextObject }[] = [];
 
         let lineToDraw: TextLineGlyph[] = [];
         let lineWidth = 0;
 
-        for (let idx = 0; idx < textSlices.length; idx++) {
-            const textSlice = textSlices[idx];
+        for (let idx = 0; idx < textObjects.length; idx++) {
+            const textObject = textObjects[idx];
 
-            if (currentBold !== textSlice.bold || currentItalic !== textSlice.italic) {
-                let result = await this.drawTextSliceBlock(lineToDraw, lineWidth, joinedText, {
+            if (textObject.type === 'slice' && currentBold === undefined) {
+                currentBold = textObject.bold;
+                currentItalic = textObject.italic;
+            }
+
+            if (
+                currentType !== textObject.type ||
+                (textObject.type === 'slice' &&
+                    (currentBold !== textObject.bold || currentItalic !== textObject.italic))
+            ) {
+                let result = await this.drawTextSliceBlock(lineToDraw, lineWidth, joinedObjects, {
                     ...textOptions,
                     bold: currentBold,
                     italic: currentItalic,
@@ -232,18 +290,25 @@ export class PDFGenerator {
                 lineToDraw = result.lineToDraw;
                 lineWidth = result.lineWidth;
 
-                currentBold = textSlice.bold;
-                currentItalic = textSlice.italic;
-                joinedText = [];
+                if (textObject.type === 'slice') {
+                    currentBold = textObject.bold;
+                    currentItalic = textObject.italic;
+                }
+                currentType = textObject.type;
+                joinedObjects = [];
             }
-            for (const chr of textSlice.text) {
-                joinedText.push({ chr, textSlice });
+
+            if (textObject.type === 'slice') {
+                for (const chr of textObject.text) {
+                    joinedObjects.push({ chr, textObject });
+                }
+            } else if (textObject.type === 'image') {
+                joinedObjects.push({ chr: '', textObject });
             }
-            currentSlice += 1;
         }
 
-        if (joinedText.length > 0) {
-            let result = await this.drawTextSliceBlock(lineToDraw, lineWidth, joinedText, {
+        if (joinedObjects.length > 0) {
+            let result = await this.drawTextSliceBlock(lineToDraw, lineWidth, joinedObjects, {
                 ...textOptions,
                 bold: currentBold,
                 italic: currentItalic,
@@ -258,55 +323,69 @@ export class PDFGenerator {
         }
     }
 
-    async drawText(node: HTMLElement, color: string, textOptions: TextOptions): Promise<TextSlice[]> {
-        let textSlices: TextSlice[] = [];
+    async drawText(node: HTMLElement, color: string, textOptions: TextOptions): Promise<TextObject[]> {
+        let textObjects: TextObject[] = [];
         if (node.nodeType !== NodeType.ELEMENT_NODE) {
             return [];
         }
 
         for (const child of node.childNodes) {
             if (child.nodeType === NodeType.TEXT_NODE) {
-                textSlices.push({ text: child.text, color, bold: textOptions.bold, italic: textOptions.italic });
+                textObjects.push({
+                    type: 'slice',
+                    text: child.text,
+                    color,
+                    bold: textOptions.bold,
+                    italic: textOptions.italic,
+                });
             } else if (child.nodeType === NodeType.ELEMENT_NODE) {
                 const element = child as HTMLElement;
-                let newColor = color;
-                if (element.tagName === 'font' && 'color' in element.attributes) {
-                    newColor = element.attributes['color'];
-                }
-                const newTextOptions = { ...textOptions };
-                if (element.tagName === 'b') {
-                    newTextOptions.bold = true;
-                }
-                if (element.tagName === 'i') {
-                    newTextOptions.italic = true;
-                }
 
-                if (element.tagName === 'div') {
-                    // Draw text before this div
-                    await this.drawTextSlices(textSlices, textOptions);
-
-                    if ('align' in element.attributes) {
-                        newTextOptions.align = element.attributes['align'];
-                    } else if ('style' in element.attributes) {
-                        if (element.attributes['style'] === 'text-align: right;') {
-                            newTextOptions.align = 'right';
-                        } else if (element.attributes['style'] === 'text-align: center;') {
-                            newTextOptions.align = 'center';
-                        }
+                if (element.tagName === 'img') {
+                    textObjects.push({
+                        type: 'image',
+                        url: element.attributes['src'],
+                    });
+                } else {
+                    let newColor = color;
+                    if (element.tagName === 'font' && 'color' in element.attributes) {
+                        newColor = element.attributes['color'];
+                    }
+                    const newTextOptions = { ...textOptions };
+                    if (element.tagName === 'b') {
+                        newTextOptions.bold = true;
+                    }
+                    if (element.tagName === 'i') {
+                        newTextOptions.italic = true;
                     }
 
-                    textSlices = await this.drawText(element, newColor, newTextOptions);
-                } else {
-                    textSlices = [...textSlices, ...(await this.drawText(element, newColor, newTextOptions))];
+                    if (element.tagName === 'div') {
+                        // Draw text before this div
+                        await this.drawTextObjects(textObjects, textOptions);
+
+                        if ('align' in element.attributes) {
+                            newTextOptions.align = element.attributes['align'];
+                        } else if ('style' in element.attributes) {
+                            if (element.attributes['style'] === 'text-align: right;') {
+                                newTextOptions.align = 'right';
+                            } else if (element.attributes['style'] === 'text-align: center;') {
+                                newTextOptions.align = 'center';
+                            }
+                        }
+
+                        textObjects = await this.drawText(element, newColor, newTextOptions);
+                    } else {
+                        textObjects = [...textObjects, ...(await this.drawText(element, newColor, newTextOptions))];
+                    }
                 }
             }
         }
 
         if (node.tagName === 'div') {
-            await this.drawTextSlices(textSlices, textOptions);
+            await this.drawTextObjects(textObjects, textOptions);
             return [];
         }
-        return textSlices;
+        return textObjects;
     }
 
     drawCutMarksForGuillotine(
