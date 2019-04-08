@@ -699,7 +699,7 @@ export class PDFGenerator {
 
                                 this.doc.addPage();
                                 for (const cardInfo of frontCards) {
-                                    let x = pageWidth - cardInfo.cardX - cardWidth;
+                                    let x = pageWidth - cardInfo.cardX - cardInfo.cardWidth;
                                     let y = cardInfo.cardY;
                                     await this.drawCard(
                                         cardInfo.cardsetData,
@@ -708,20 +708,20 @@ export class PDFGenerator {
                                         cardInfo.cardId,
                                         x,
                                         y,
-                                        cardWidth,
-                                        cardHeight,
+                                        cardInfo.cardWidth,
+                                        cardInfo.cardHeight,
                                     );
                                     verticalGuillotineMarks.push(
                                         x + (data.includeBleedingArea ? BLEED_WIDTH * PTPMM : 0),
                                     );
                                     verticalGuillotineMarks.push(
-                                        x + cardWidth - (data.includeBleedingArea ? BLEED_WIDTH * PTPMM : 0),
+                                        x + cardInfo.cardWidth - (data.includeBleedingArea ? BLEED_WIDTH * PTPMM : 0),
                                     );
                                     horizontalGuillotineMarks.push(
                                         y + (data.includeBleedingArea ? BLEED_WIDTH * PTPMM : 0),
                                     );
                                     horizontalGuillotineMarks.push(
-                                        y + cardHeight - (data.includeBleedingArea ? BLEED_WIDTH * PTPMM : 0),
+                                        y + cardInfo.cardHeight - (data.includeBleedingArea ? BLEED_WIDTH * PTPMM : 0),
                                     );
                                 }
 
