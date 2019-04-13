@@ -14,17 +14,18 @@ const generatePdfForSample = async (username: string, password: string) => {
         const accessToken = resp.data['accessToken'];
 
         const data: JobData = {
-            collectionType: 'games',
-            collectionId: '26',
+            collectionType: 'cardsets',
+            collectionId: '657',
             pageWidth: 210,
             pageHeight: 297,
             topBottomMargin: 15,
             leftRightMargin: 9,
             verticalSpace: 0,
             horizontalSpace: 0,
-            includeBleedingArea: false,
-            cutMarksForScissors: true,
+            includeBleedingArea: true,
+            cutMarksForScissors: false,
             cutMarksForGuillotine: true,
+            cutMarksOnFrontSideOnly: true,
             accessToken,
         };
 

@@ -82,6 +82,7 @@ export interface JobData {
     includeBleedingArea: boolean;
     cutMarksForScissors: boolean;
     cutMarksForGuillotine: boolean;
+    cutMarksOnFrontSideOnly: boolean;
 }
 
 export interface CardSetData {

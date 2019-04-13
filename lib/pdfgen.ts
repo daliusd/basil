@@ -444,6 +444,55 @@ export class PDFGenerator {
         this.doc.restore();
     }
 
+    async drawGuillotineCutLines(cardX: number, cardY: number, cardWidth: number, cardHeight: number) {
+        this.doc.save();
+        this.doc
+            .moveTo(cardX, cardY)
+            .lineTo(cardX + 2 * PTPMM, cardY)
+            .lineWidth(0.1 * PTPMM)
+            .stroke('#ccc');
+        this.doc
+            .moveTo(cardX, cardY)
+            .lineTo(cardX, cardY + 2 * PTPMM)
+            .lineWidth(0.1 * PTPMM)
+            .stroke('#ccc');
+
+        this.doc
+            .moveTo(cardX + cardWidth, cardY)
+            .lineTo(cardX + cardWidth - 2 * PTPMM, cardY)
+            .lineWidth(0.1 * PTPMM)
+            .stroke('#ccc');
+        this.doc
+            .moveTo(cardX + cardWidth, cardY)
+            .lineTo(cardX + cardWidth, cardY + 2 * PTPMM)
+            .lineWidth(0.1 * PTPMM)
+            .stroke('#ccc');
+
+        this.doc
+            .moveTo(cardX + cardWidth, cardY + cardHeight)
+            .lineTo(cardX + cardWidth - 2 * PTPMM, cardY + cardHeight)
+            .lineWidth(0.1 * PTPMM)
+            .stroke('#ccc');
+        this.doc
+            .moveTo(cardX + cardWidth, cardY + cardHeight)
+            .lineTo(cardX + cardWidth, cardY + cardHeight - 2 * PTPMM)
+            .lineWidth(0.1 * PTPMM)
+            .stroke('#ccc');
+
+        this.doc
+            .moveTo(cardX, cardY + cardHeight)
+            .lineTo(cardX + 2 * PTPMM, cardY + cardHeight)
+            .lineWidth(0.1 * PTPMM)
+            .stroke('#ccc');
+        this.doc
+            .moveTo(cardX, cardY + cardHeight)
+            .lineTo(cardX, cardY + cardHeight - 2 * PTPMM)
+            .lineWidth(0.1 * PTPMM)
+            .stroke('#ccc');
+
+        this.doc.restore();
+    }
+
     async drawCard(
         data: CardSetData,
         jobData: JobData,
@@ -571,13 +620,22 @@ export class PDFGenerator {
 
         this.doc.restore();
 
-        if (jobData.cutMarksForScissors) {
-            await this.drawCutLines(
-                cardX + (jobData.includeBleedingArea ? BLEED_WIDTH * PTPMM : 0),
-                cardY + (jobData.includeBleedingArea ? BLEED_WIDTH * PTPMM : 0),
-                cardWidth - (jobData.includeBleedingArea ? BLEED_WIDTH * 2 * PTPMM : 0),
-                cardHeight - (jobData.includeBleedingArea ? BLEED_WIDTH * 2 * PTPMM : 0),
-            );
+        if (!jobData.cutMarksOnFrontSideOnly || !isBack) {
+            if (jobData.cutMarksForScissors) {
+                await this.drawCutLines(
+                    cardX + (jobData.includeBleedingArea ? BLEED_WIDTH * PTPMM : 0),
+                    cardY + (jobData.includeBleedingArea ? BLEED_WIDTH * PTPMM : 0),
+                    cardWidth - (jobData.includeBleedingArea ? BLEED_WIDTH * 2 * PTPMM : 0),
+                    cardHeight - (jobData.includeBleedingArea ? BLEED_WIDTH * 2 * PTPMM : 0),
+                );
+            } else if (jobData.cutMarksForGuillotine) {
+                await this.drawGuillotineCutLines(
+                    cardX + (jobData.includeBleedingArea ? BLEED_WIDTH * PTPMM : 0),
+                    cardY + (jobData.includeBleedingArea ? BLEED_WIDTH * PTPMM : 0),
+                    cardWidth - (jobData.includeBleedingArea ? BLEED_WIDTH * 2 * PTPMM : 0),
+                    cardHeight - (jobData.includeBleedingArea ? BLEED_WIDTH * 2 * PTPMM : 0),
+                );
+            }
         }
     }
 
