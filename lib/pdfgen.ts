@@ -403,13 +403,13 @@ export class PDFGenerator {
                 .moveTo(x, 0)
                 .lineTo(x, topBottomMargin / 2)
                 .lineWidth(0.1 * PTPMM)
-                .stroke('#000');
+                .stroke('#ccc');
 
             this.doc
                 .moveTo(x, pageHeight)
                 .lineTo(x, pageHeight - topBottomMargin / 2)
                 .lineWidth(0.1 * PTPMM)
-                .stroke('#000');
+                .stroke('#ccc');
         }
 
         for (const y of horizontalGuillotineMarks) {
@@ -417,13 +417,13 @@ export class PDFGenerator {
                 .moveTo(0, y)
                 .lineTo(leftRightMargin / 2, y)
                 .lineWidth(0.1 * PTPMM)
-                .stroke('#000');
+                .stroke('#ccc');
 
             this.doc
                 .moveTo(pageWidth, y)
                 .lineTo(pageWidth - leftRightMargin / 2, y)
                 .lineWidth(0.1 * PTPMM)
-                .stroke('#000');
+                .stroke('#ccc');
         }
 
         this.doc.restore();
@@ -786,7 +786,7 @@ export class PDFGenerator {
                                 frontCards = [];
                             }
 
-                            if (data.cutMarksForGuillotine) {
+                            if (data.cutMarksForGuillotine && (!isTwoSided || !data.cutMarksOnFrontSideOnly)) {
                                 this.drawCutMarksForGuillotine(
                                     verticalGuillotineMarks,
                                     horizontalGuillotineMarks,
@@ -830,7 +830,7 @@ export class PDFGenerator {
             }
 
             if (isTwoSided && frontCards.length > 0) {
-                if (data.cutMarksForGuillotine) {
+                if (data.cutMarksForGuillotine && !data.cutMarksOnFrontSideOnly) {
                     this.drawCutMarksForGuillotine(
                         verticalGuillotineMarks,
                         horizontalGuillotineMarks,
@@ -869,7 +869,7 @@ export class PDFGenerator {
                     );
                 }
 
-                if (data.cutMarksForGuillotine) {
+                if (data.cutMarksForGuillotine && (!isTwoSided || !data.cutMarksOnFrontSideOnly)) {
                     this.drawCutMarksForGuillotine(
                         verticalGuillotineMarks,
                         horizontalGuillotineMarks,
