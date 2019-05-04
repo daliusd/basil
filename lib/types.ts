@@ -96,3 +96,24 @@ export interface CardSetData {
     texts: PlaceholdersTextInfoByCardCollection;
     images: PlaceholdersImageInfoByCardCollection;
 }
+
+export enum ImageType {
+    SVG,
+    SVG_PATH,
+    IMAGE,
+    BLOCK_START,
+    BLOCK_END,
+}
+
+export interface ImageToDraw {
+    type: ImageType;
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+    angle: number;
+    fit?: string;
+    data: any;
+    color?: string;
+    scale?: number;
+}
