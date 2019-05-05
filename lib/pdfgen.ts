@@ -1,10 +1,9 @@
 import PDFDocument = require('pdfkit');
-
-import { CardSetData, JobData, ImageType, ImageToDraw } from './types';
-
+import * as buffer from 'buffer';
 const SVGtoPDF = require('svg-to-pdfkit');
 
-import { makeAuthRequest } from './requests';
+import { CardSetData, JobData, ImageType, ImageToDraw } from './types';
+import { makeAuthRequest, makeRequest } from './requests';
 import { CardGenerator } from './card';
 
 // Constants
@@ -178,14 +177,37 @@ export class PDFGenerator {
                 this.doc.restore();
             } else if (imageToDraw.type === ImageType.IMAGE) {
                 this.prepareImageToDrawSpace(imageToDraw);
-                this.doc.image(imageToDraw.data, 0, 0, {
-                    width:
-                        !imageToDraw.fit || imageToDraw.fit === 'width' || imageToDraw.fit === 'stretch'
-                            ? imageToDraw.width
-                            : undefined,
-                    height:
-                        imageToDraw.fit === 'height' || imageToDraw.fit === 'stretch' ? imageToDraw.height : undefined,
-                });
+
+                let url = imageToDraw.data;
+                if (!url.startsWith('http')) {
+                    url = this.serverUrl + url;
+                }
+                let resp = await makeRequest(url);
+                const buf = buffer.Buffer.from(resp.data);
+
+                if (resp.headers['content-type'] === 'image/svg+xml') {
+                    SVGtoPDF(this.doc, buf.toString(), 0, 0, {
+                        width: imageToDraw.width * PTPMM,
+                        height: imageToDraw.height * PTPMM,
+                        preserveAspectRatio:
+                            imageToDraw.fit === 'stretch'
+                                ? 'none'
+                                : imageToDraw.fit === 'height'
+                                ? 'xMinYMid slice'
+                                : 'xMidYMin meet',
+                    });
+                } else {
+                    this.doc.image(buf, 0, 0, {
+                        width:
+                            !imageToDraw.fit || imageToDraw.fit === 'width' || imageToDraw.fit === 'stretch'
+                                ? imageToDraw.width
+                                : undefined,
+                        height:
+                            imageToDraw.fit === 'height' || imageToDraw.fit === 'stretch'
+                                ? imageToDraw.height
+                                : undefined,
+                    });
+                }
                 this.doc.restore();
             } else if (imageToDraw.type === ImageType.BLOCK_START) {
                 this.prepareImageToDrawSpace(imageToDraw);

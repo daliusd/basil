@@ -155,32 +155,15 @@ export class CardGenerator {
                     angle: 0,
                 });
             } else {
-                let resp = await makeRequest(tlg.glyph.url);
-                const buf = buffer.Buffer.from(resp.data);
-
-                let pos = {
+                imagesToDraw.push({
                     x: lineX,
                     y: lineY - textOptions.fontSize,
                     angle: 0,
-                };
-
-                if (resp.headers['content-type'] === 'image/svg+xml') {
-                    imagesToDraw.push({
-                        ...pos,
-                        width: textOptions.fontSize,
-                        height: textOptions.fontSize,
-                        type: ImageType.SVG,
-                        data: buf,
-                    });
-                } else {
-                    imagesToDraw.push({
-                        ...pos,
-                        width: textOptions.fontSize,
-                        height: textOptions.fontSize,
-                        type: ImageType.IMAGE,
-                        data: buf,
-                    });
-                }
+                    width: textOptions.fontSize,
+                    height: textOptions.fontSize,
+                    type: ImageType.IMAGE,
+                    data: tlg.glyph.url,
+                });
             }
 
             lineX += tlg.advanceWidth;
@@ -461,22 +444,11 @@ export class CardGenerator {
                     };
                 } else if (imageInfo.url) {
                     try {
-                        let resp = await makeRequest(this.serverUrl + imageInfo.url);
-                        const buf = buffer.Buffer.from(resp.data);
-
-                        if (resp.headers['content-type'] === 'image/svg+xml') {
-                            yield {
-                                ...result,
-                                type: ImageType.SVG,
-                                data: buf,
-                            };
-                        } else {
-                            yield {
-                                ...result,
-                                type: ImageType.IMAGE,
-                                data: buf,
-                            };
-                        }
+                        yield {
+                            ...result,
+                            type: ImageType.IMAGE,
+                            data: imageInfo.url,
+                        };
                     } catch {
                         // TODO: handle error here
                     }
