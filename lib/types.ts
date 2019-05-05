@@ -69,7 +69,12 @@ export interface PlaceholdersImageInfoByCardCollection {
     [propName: string]: PlaceholdersImageInfoCollection;
 }
 
-export interface JobData {
+export interface JobDataBase {
+    type: string;
+}
+
+export interface PdfJobData extends JobDataBase {
+    type: 'generatePdf';
     accessToken: string;
     collectionType: string;
     collectionId: string;
@@ -84,6 +89,15 @@ export interface JobData {
     cutMarksForGuillotine: boolean;
     cutMarksOnFrontSideOnly: boolean;
 }
+
+export interface CardJobData extends JobDataBase {
+    type: 'generateCard';
+    cardSetdata: CardSetData;
+    cardId: string;
+    isBack: boolean;
+}
+
+export type JobData = PdfJobData | CardJobData;
 
 export interface CardSetData {
     width: number;

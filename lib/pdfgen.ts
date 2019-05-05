@@ -2,7 +2,7 @@ import PDFDocument = require('pdfkit');
 import * as buffer from 'buffer';
 const SVGtoPDF = require('svg-to-pdfkit');
 
-import { CardSetData, JobData, ImageType, ImageToDraw } from './types';
+import { CardSetData, PdfJobData, ImageType, ImageToDraw } from './types';
 import { makeAuthRequest, makeRequest } from './requests';
 import { CardGenerator } from './card';
 
@@ -134,7 +134,7 @@ export class PDFGenerator {
 
     async drawCard(
         data: CardSetData,
-        jobData: JobData,
+        jobData: PdfJobData,
         isBack: boolean,
         cardId: string,
         cardX: number,
@@ -239,7 +239,12 @@ export class PDFGenerator {
 
     // PDF generation
 
-    generatePdf = async (data: JobData, serverUrl: string, outStream: NodeJS.WritableStream, callback: () => void) => {
+    generatePdf = async (
+        data: PdfJobData,
+        serverUrl: string,
+        outStream: NodeJS.WritableStream,
+        callback: () => void,
+    ) => {
         try {
             let cardsets: CardSetData[] = [];
             this.serverUrl = serverUrl;

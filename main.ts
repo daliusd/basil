@@ -3,7 +3,7 @@ import * as yargs from 'yargs';
 
 import * as fs from 'fs';
 
-import { JobData } from './lib/types';
+import { PdfJobData } from './lib/types';
 import { PDFGenerator } from './lib/pdfgen';
 
 const SERVER = 'http://localhost:5000';
@@ -13,7 +13,8 @@ const generatePdfForSample = async (username: string, password: string) => {
         const resp = await axios.post(`${SERVER}/api/tokens`, { username, password });
         const accessToken = resp.data['accessToken'];
 
-        const data: JobData = {
+        const data: PdfJobData = {
+            type: 'generatePdf',
             collectionType: 'cardsets',
             collectionId: '657',
             pageWidth: 210,
