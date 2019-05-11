@@ -143,11 +143,10 @@ export class PDFGenerator {
         cardHeight: number,
     ) {
         this.doc.save();
-        this.doc.transform(PTPMM, 0, 0, 0, PTPMM, 0);
 
         this.doc.rect(cardX, cardY, cardWidth, cardHeight).clip();
         if (!jobData.includeBleedingArea) {
-            this.doc.translate(-BLEED_WIDTH, -BLEED_WIDTH);
+            this.doc.translate(-BLEED_WIDTH * PTPMM, -BLEED_WIDTH * PTPMM);
         }
 
         this.doc.translate(cardX, cardY);
@@ -156,7 +155,8 @@ export class PDFGenerator {
         for await (const imageToDraw of cardGen.processCard(data, cardId, isBack)) {
             if (imageToDraw.type === ImageType.SVG) {
                 this.prepareImageToDrawSpace(imageToDraw);
-                SVGtoPDF(this.doc, imageToDraw.data.toString(), 0, 0, {
+                const svg = buffer.Buffer.from(imageToDraw.data, 'base64').toString();
+                SVGtoPDF(this.doc, svg, 0, 0, {
                     width: imageToDraw.width * PTPMM,
                     height: imageToDraw.height * PTPMM,
                     preserveAspectRatio:
@@ -200,11 +200,11 @@ export class PDFGenerator {
                     this.doc.image(buf, 0, 0, {
                         width:
                             !imageToDraw.fit || imageToDraw.fit === 'width' || imageToDraw.fit === 'stretch'
-                                ? imageToDraw.width
+                                ? imageToDraw.width * PTPMM
                                 : undefined,
                         height:
                             imageToDraw.fit === 'height' || imageToDraw.fit === 'stretch'
-                                ? imageToDraw.height
+                                ? imageToDraw.height * PTPMM
                                 : undefined,
                     });
                 }

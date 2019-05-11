@@ -436,11 +436,10 @@ export class CardGenerator {
                 };
 
                 if (imageInfo.base64) {
-                    const svg = Buffer.from(imageInfo.base64, 'base64');
                     yield {
                         ...result,
                         type: ImageType.SVG,
-                        data: svg,
+                        data: imageInfo.base64,
                     };
                 } else if (imageInfo.url) {
                     try {

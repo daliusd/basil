@@ -21,7 +21,7 @@ onmessage = async (event: MessageEvent) => {
             });
         });
     } else if (data.type === 'generateCard') {
-        const cardGen = new CardGenerator('').processCard(data.cardSetdata, data.cardId, data.isBack);
+        const cardGen = new CardGenerator('').processCard(data.cardSetData, data.cardId, data.isBack);
 
         postMessage({
             type: 'generateCard',

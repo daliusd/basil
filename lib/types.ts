@@ -92,7 +92,7 @@ export interface PdfJobData extends JobDataBase {
 
 export interface CardJobData extends JobDataBase {
     type: 'generateCard';
-    cardSetdata: CardSetData;
+    cardSetData: CardSetData;
     cardId: string;
     isBack: boolean;
 }
