@@ -32,13 +32,13 @@ export class PDFGenerator {
                 .moveTo(x, 0)
                 .lineTo(x, topBottomMargin / 2)
                 .lineWidth(0.1 * PTPMM)
-                .stroke('#ccc');
+                .stroke('#000');
 
             this.doc
                 .moveTo(x, pageHeight)
                 .lineTo(x, pageHeight - topBottomMargin / 2)
                 .lineWidth(0.1 * PTPMM)
-                .stroke('#ccc');
+                .stroke('#000');
         }
 
         for (const y of horizontalGuillotineMarks) {
@@ -46,13 +46,13 @@ export class PDFGenerator {
                 .moveTo(0, y)
                 .lineTo(leftRightMargin / 2, y)
                 .lineWidth(0.1 * PTPMM)
-                .stroke('#ccc');
+                .stroke('#000');
 
             this.doc
                 .moveTo(pageWidth, y)
                 .lineTo(pageWidth - leftRightMargin / 2, y)
                 .lineWidth(0.1 * PTPMM)
-                .stroke('#ccc');
+                .stroke('#000');
         }
 
         this.doc.restore();
@@ -81,50 +81,45 @@ export class PDFGenerator {
         intoBleedArea: boolean,
     ) {
         let m = intoBleedArea ? -1 : 1;
+
         this.doc.save();
-        this.doc
-            .moveTo(cardX, cardY)
-            .lineTo(cardX + m * 2 * PTPMM, cardY)
-            .lineWidth(0.1 * PTPMM)
-            .stroke('#ccc');
-        this.doc
-            .moveTo(cardX, cardY)
-            .lineTo(cardX, cardY + m * 2 * PTPMM)
-            .lineWidth(0.1 * PTPMM)
-            .stroke('#ccc');
+        for (const x of [0, 1]) {
+            let dx = x === 0 ? 1 : -1;
 
-        this.doc
-            .moveTo(cardX + cardWidth, cardY)
-            .lineTo(cardX + cardWidth - m * 2 * PTPMM, cardY)
-            .lineWidth(0.1 * PTPMM)
-            .stroke('#ccc');
-        this.doc
-            .moveTo(cardX + cardWidth, cardY)
-            .lineTo(cardX + cardWidth, cardY + m * 2 * PTPMM)
-            .lineWidth(0.1 * PTPMM)
-            .stroke('#ccc');
+            for (const y of [0, 1]) {
+                let dy = y === 0 ? 1 : -1;
+                let sx = cardX + cardWidth * x;
+                let sy = cardY + cardHeight * y;
+                let ex1 = cardX + cardWidth * x + m * dx * 2 * PTPMM;
+                let ey1 = sy;
+                let ex2 = sx;
+                let ey2 = cardY + cardHeight * y + m * dy * 2 * PTPMM;
 
-        this.doc
-            .moveTo(cardX + cardWidth, cardY + cardHeight)
-            .lineTo(cardX + cardWidth - m * 2 * PTPMM, cardY + cardHeight)
-            .lineWidth(0.1 * PTPMM)
-            .stroke('#ccc');
-        this.doc
-            .moveTo(cardX + cardWidth, cardY + cardHeight)
-            .lineTo(cardX + cardWidth, cardY + cardHeight - m * 2 * PTPMM)
-            .lineWidth(0.1 * PTPMM)
-            .stroke('#ccc');
+                this.doc
+                    .moveTo(sx, sy)
+                    .lineTo(ex1, ey1)
+                    .lineWidth(0.1 * PTPMM)
+                    .stroke('#FFFFFF');
+                this.doc
+                    .moveTo(sx, sy)
+                    .lineTo(ex1, ey1)
+                    .lineWidth(0.1 * PTPMM)
+                    .dash(0.3 * PTPMM, {})
+                    .stroke('#000000');
 
-        this.doc
-            .moveTo(cardX, cardY + cardHeight)
-            .lineTo(cardX + m * 2 * PTPMM, cardY + cardHeight)
-            .lineWidth(0.1 * PTPMM)
-            .stroke('#ccc');
-        this.doc
-            .moveTo(cardX, cardY + cardHeight)
-            .lineTo(cardX, cardY + cardHeight - m * 2 * PTPMM)
-            .lineWidth(0.1 * PTPMM)
-            .stroke('#ccc');
+                this.doc
+                    .moveTo(sx, sy)
+                    .lineTo(ex2, ey2)
+                    .lineWidth(0.1 * PTPMM)
+                    .stroke('#FFFFFF');
+                this.doc
+                    .moveTo(sx, sy)
+                    .lineTo(ex2, ey2)
+                    .lineWidth(0.1 * PTPMM)
+                    .dash(0.3 * PTPMM, {})
+                    .stroke('#000000');
+            }
+        }
 
         this.doc.restore();
     }
