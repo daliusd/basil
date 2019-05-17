@@ -26,6 +26,7 @@ const generatePdfForSample = async (username: string, password: string) => {
             includeBleedingArea: true,
             cutMarksForScissors: false,
             cutMarksForGuillotine: true,
+            cutMarksInMarginArea: true,
             cutMarksOnFrontSideOnly: true,
             accessToken,
         };

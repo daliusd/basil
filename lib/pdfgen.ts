@@ -342,7 +342,7 @@ export class PDFGenerator {
                     for (let idx = 0; idx < cardInfo.count; idx++) {
                         if (addNewPage) {
                             if (isTwoSided) {
-                                if (data.cutMarksForGuillotine) {
+                                if (data.cutMarksInMarginArea) {
                                     this.drawCutMarksForGuillotine(
                                         verticalGuillotineMarks,
                                         horizontalGuillotineMarks,
@@ -386,7 +386,7 @@ export class PDFGenerator {
                                 frontCards = [];
                             }
 
-                            if (data.cutMarksForGuillotine && (!isTwoSided || !data.cutMarksOnFrontSideOnly)) {
+                            if (data.cutMarksInMarginArea && (!isTwoSided || !data.cutMarksOnFrontSideOnly)) {
                                 this.drawCutMarksForGuillotine(
                                     verticalGuillotineMarks,
                                     horizontalGuillotineMarks,
@@ -430,7 +430,7 @@ export class PDFGenerator {
             }
 
             if (isTwoSided && frontCards.length > 0) {
-                if (data.cutMarksForGuillotine && !data.cutMarksOnFrontSideOnly) {
+                if (data.cutMarksInMarginArea && !data.cutMarksOnFrontSideOnly) {
                     this.drawCutMarksForGuillotine(
                         verticalGuillotineMarks,
                         horizontalGuillotineMarks,
@@ -469,7 +469,7 @@ export class PDFGenerator {
                     );
                 }
 
-                if (data.cutMarksForGuillotine && (!isTwoSided || !data.cutMarksOnFrontSideOnly)) {
+                if (data.cutMarksInMarginArea && (!isTwoSided || !data.cutMarksOnFrontSideOnly)) {
                     this.drawCutMarksForGuillotine(
                         verticalGuillotineMarks,
                         horizontalGuillotineMarks,

@@ -87,6 +87,7 @@ export interface PdfJobData extends JobDataBase {
     includeBleedingArea: boolean;
     cutMarksForScissors: boolean;
     cutMarksForGuillotine: boolean;
+    cutMarksInMarginArea: boolean;
     cutMarksOnFrontSideOnly: boolean;
 }
 
