@@ -90,7 +90,7 @@ export class PDFGenerator {
                 let dy = y === 0 ? 1 : -1;
                 let sx = cardX + cardWidth * x;
                 let sy = cardY + cardHeight * y;
-                let ex1 = cardX + cardWidth * x + m * dx * 2 * PTPMM;
+                let ex1 = cardX + cardWidth * x + dx * 2 * PTPMM;
                 let ey1 = sy;
                 let ex2 = sx;
                 let ey2 = cardY + cardHeight * y + m * dy * 2 * PTPMM;
