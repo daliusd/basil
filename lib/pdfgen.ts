@@ -258,7 +258,9 @@ export class PDFGenerator {
                     `${this.serverUrl}/api/${data.collectionType}/${data.collectionId}`,
                     data.accessToken,
                 );
-                const cardsetsList = resp.data.cardsets;
+                let cardsetsList = resp.data.cardsets;
+                cardsetsList.sort((a: any, b: any) => (a.name < b.name ? -1 : 1));
+
                 for (const cardsetInfo of cardsetsList) {
                     resp = await makeAuthRequest(`${this.serverUrl}/api/cardsets/${cardsetInfo.id}`, data.accessToken);
                     let cardsetData: CardSetData = JSON.parse(resp.data.data);
