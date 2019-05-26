@@ -24,6 +24,8 @@ interface TextSlice {
 interface ImageInText {
     type: 'image';
     url: string;
+    width: number;
+    height: number;
 }
 
 interface LineBreak {
@@ -176,7 +178,7 @@ export class CardGenerator {
                     x: lineX,
                     y: lineY - textOptions.fontSize,
                     angle: 0,
-                    width: textOptions.fontSize,
+                    width: textOptions.fontSize * tlg.glyph.ratio,
                     height: textOptions.fontSize,
                     type: ImageType.IMAGE,
                     data: tlg.glyph.url,
@@ -203,9 +205,14 @@ export class CardGenerator {
         } else if (joinedObjects[0].textObject.type === 'image') {
             for (const obj of joinedObjects) {
                 if (obj.textObject.type === 'image') {
+                    let width = obj.textObject.width;
+                    let height = obj.textObject.height;
+                    let ratio = width / height;
+
                     glyphs.push({
                         url: obj.textObject.url,
-                        advanceWidth: font.head.unitsPerEm,
+                        advanceWidth: font.head.unitsPerEm * ratio,
+                        ratio,
                     });
                 }
             }
@@ -323,6 +330,19 @@ export class CardGenerator {
         return this.imagesToDraw;
     }
 
+    toInt(field: string): number {
+        if (field === undefined) {
+            return 1;
+        }
+
+        let val = parseInt(field, 10);
+        if (!val || isNaN(val)) {
+            val = 1;
+        }
+
+        return val;
+    }
+
     collectTextObjects(node: HTMLElement, color: string, textOptions: TextOptions): TextObject[] {
         let textObjects: TextObject[] = [];
         if (node.nodeType !== NodeType.ELEMENT_NODE) {
@@ -345,6 +365,8 @@ export class CardGenerator {
                     textObjects.push({
                         type: 'image',
                         url: element.attributes['src'],
+                        width: this.toInt(element.attributes['data-width']),
+                        height: this.toInt(element.attributes['data-height']),
                     });
                 } else {
                     let newColor = color;
