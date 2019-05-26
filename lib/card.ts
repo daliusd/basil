@@ -26,7 +26,15 @@ interface ImageInText {
     url: string;
 }
 
-type TextObject = TextSlice | ImageInText;
+interface LineBreak {
+    type: 'br';
+}
+
+interface CarriageReturn {
+    type: 'cr';
+}
+
+type TextObject = TextSlice | ImageInText | LineBreak | CarriageReturn;
 
 interface TextOptions {
     fontFamily: string;
@@ -44,6 +52,7 @@ interface TextLineGlyph {
     glyph: any;
     color: string;
     advanceWidth: number;
+    textOptions: TextOptions;
 }
 
 const BOLD_MAP: Record<string, string[]> = {
@@ -119,17 +128,25 @@ export class CardGenerator {
         return this.knownFonts[fontName];
     }
 
-    async drawTextLine(textLine: TextLineGlyph[], textOptions: TextOptions, yPos: number): Promise<ImageToDraw[]> {
-        let imagesToDraw: ImageToDraw[] = [];
+    lineToDraw: TextLineGlyph[] = [];
+    lineWidth = 0;
+    yPos = 0;
+    imagesToDraw: ImageToDraw[] = [];
 
-        const lineWidth = textLine.map(l => l.advanceWidth).reduce((a, b) => a + b, 0);
+    async drawTextLine() {
+        if (this.lineToDraw.length <= 0) {
+            return;
+        }
+        let textOptions = this.lineToDraw[0].textOptions;
+
+        const lineWidth = this.lineToDraw.map(l => l.advanceWidth).reduce((a, b) => a + b, 0);
 
         const font = await this.getFont(textOptions);
         const fontHeight = (font.hhea.ascent - font.hhea.descent) / font.head.unitsPerEm;
         const addOn = (textOptions.lineHeight - fontHeight) / 2;
         const ascent = (addOn + font.hhea.ascent / font.head.unitsPerEm) * textOptions.fontSize;
 
-        let lineY = yPos + ascent;
+        let lineY = this.yPos + ascent;
         let lineX = 0;
 
         if (textOptions.align === 'center') {
@@ -140,10 +157,10 @@ export class CardGenerator {
 
         const scale = (1.0 / font.head.unitsPerEm) * textOptions.fontSize;
 
-        for (const tlg of textLine) {
+        for (const tlg of this.lineToDraw) {
             if (!tlg.glyph.url) {
                 const flipped = this.flip(tlg.glyph.path.toSVG());
-                imagesToDraw.push({
+                this.imagesToDraw.push({
                     x: lineX,
                     y: lineY,
                     width: tlg.advanceWidth,
@@ -155,7 +172,7 @@ export class CardGenerator {
                     angle: 0,
                 });
             } else {
-                imagesToDraw.push({
+                this.imagesToDraw.push({
                     x: lineX,
                     y: lineY - textOptions.fontSize,
                     angle: 0,
@@ -169,20 +186,13 @@ export class CardGenerator {
             lineX += tlg.advanceWidth;
         }
 
-        return imagesToDraw;
+        this.lineToDraw = [];
+        this.lineWidth = 0;
     }
 
-    async drawTextSliceBlock(
-        lineToDraw: TextLineGlyph[],
-        lineWidth: number,
-        joinedObjects: { chr: string; textObject: TextObject }[],
-        textOptions: TextOptions,
-        yPos: number,
-    ): Promise<{ lineToDraw: TextLineGlyph[]; lineWidth: number; yPos: number; imagesToDraw: ImageToDraw[] }> {
-        let imagesToDraw: ImageToDraw[] = [];
-
+    async drawJoinedObjects(joinedObjects: { chr: string; textObject: TextObject }[], textOptions: TextOptions) {
         if (joinedObjects.length === 0) {
-            return { lineToDraw, lineWidth, yPos, imagesToDraw };
+            return;
         }
 
         const font = await this.getFont(textOptions);
@@ -207,139 +217,116 @@ export class CardGenerator {
             let advanceWidth = (glyph.advanceWidth / font.head.unitsPerEm) * textOptions.fontSize;
 
             const obj = joinedObjects[charNo].textObject;
-            lineToDraw.push({ glyph, color: obj.type === 'slice' ? obj.color : '#000000', advanceWidth });
+            this.lineToDraw.push({
+                glyph,
+                color: obj.type === 'slice' ? obj.color : '#000000',
+                advanceWidth,
+                textOptions,
+            });
 
-            if (lineToDraw.length > 1 && joinedObjects[charNo].chr === ' ') {
-                lastSpace = lineToDraw.length - 1;
+            if (this.lineToDraw.length > 1 && glyph.codePoints && glyph.codePoints.includes(32)) {
+                lastSpace = this.lineToDraw.length - 1;
             }
 
-            lineWidth += advanceWidth;
-            if (lineWidth > textOptions.width) {
-                let partToDraw: TextLineGlyph[] = [];
+            this.lineWidth += advanceWidth;
+            if (this.lineWidth > textOptions.width) {
+                let remainder: TextLineGlyph[] = [];
+
                 if (lastSpace !== -1) {
-                    partToDraw = lineToDraw.splice(0, lastSpace);
-                    lineToDraw = lineToDraw.slice(1); // Remove space for remaining part
+                    remainder = this.lineToDraw.splice(lastSpace + 1);
+                    this.lineToDraw = this.lineToDraw.splice(0, lastSpace);
                 } else {
-                    partToDraw = lineToDraw.splice(0, lineToDraw.length - 1);
+                    remainder = this.lineToDraw.splice(this.lineToDraw.length - 1);
+                    this.lineToDraw = this.lineToDraw.splice(0, this.lineToDraw.length - 1);
                 }
 
-                let result = await this.drawTextLine(partToDraw, textOptions, yPos);
-                imagesToDraw = imagesToDraw.concat(result);
-                lineWidth = lineToDraw.map(l => l.advanceWidth).reduce((a, b) => a + b, 0);
+                let result = await this.drawTextLine();
+
+                this.lineToDraw = remainder;
+                this.lineWidth = this.lineToDraw.map(l => l.advanceWidth).reduce((a, b) => a + b, 0);
                 lastSpace = -1;
 
-                yPos += textOptions.fontSize * textOptions.lineHeight; // Move cursor one text line down
+                this.yPos += textOptions.fontSize * textOptions.lineHeight; // Move cursor one text line down
             }
 
-            charNo++;
+            charNo += glyph.codePoints ? Math.max(glyph.codePoints.length, 1) : 1;
         }
-
-        return { lineToDraw, lineWidth, imagesToDraw, yPos };
     }
 
-    async drawTextObjects(
-        textObjects: TextObject[],
-        textOptions: TextOptions,
-        yPos: number,
-    ): Promise<{ imagesToDraw: ImageToDraw[]; yPos: number }> {
-        let imagesToDraw: ImageToDraw[] = [];
-
+    async drawTextObjects(textObjects: TextObject[], textOptions: TextOptions): Promise<ImageToDraw[]> {
         if (textObjects.length === 0) {
-            return { imagesToDraw: [], yPos };
+            return [];
         }
 
-        let currentBold = false;
-        let currentItalic = false;
-        let currentType = 'slice';
+        this.imagesToDraw = [];
+
+        let firstObject = textObjects[0];
+        let currentBold = firstObject.type === 'slice' ? firstObject.bold : false;
+        let currentItalic = firstObject.type === 'slice' ? firstObject.italic : false;
+        let currentType = firstObject.type;
+        let isNewLine = true;
         let joinedObjects: { chr: string; textObject: TextObject }[] = [];
 
-        let lineToDraw: TextLineGlyph[] = [];
-        let lineWidth = 0;
+        this.lineToDraw = [];
+        this.lineWidth = 0;
+        this.yPos = 0;
 
-        for (let idx = 0; idx < textObjects.length; idx++) {
-            const textObject = textObjects[idx];
-
-            if (textObject.type === 'slice' && currentBold === undefined) {
-                currentBold = textObject.bold;
-                currentItalic = textObject.italic;
-            }
-
+        for (const textObject of textObjects) {
             if (
                 currentType !== textObject.type ||
                 (textObject.type === 'slice' &&
                     (currentBold !== textObject.bold || currentItalic !== textObject.italic))
             ) {
-                let result = await this.drawTextSliceBlock(
-                    lineToDraw,
-                    lineWidth,
-                    joinedObjects,
-                    {
-                        ...textOptions,
-                        bold: currentBold,
-                        italic: currentItalic,
-                    },
-                    yPos,
-                );
+                let result = await this.drawJoinedObjects(joinedObjects, {
+                    ...textOptions,
+                    bold: currentBold,
+                    italic: currentItalic,
+                });
 
-                lineToDraw = result.lineToDraw;
-                lineWidth = result.lineWidth;
-                imagesToDraw = imagesToDraw.concat(result.imagesToDraw);
-                yPos = result.yPos;
-
-                if (textObject.type === 'slice') {
-                    currentBold = textObject.bold;
-                    currentItalic = textObject.italic;
-                }
                 currentType = textObject.type;
                 joinedObjects = [];
             }
 
             if (textObject.type === 'slice') {
+                currentBold = textObject.bold;
+                currentItalic = textObject.italic;
                 for (const chr of textObject.text) {
                     joinedObjects.push({ chr, textObject });
                 }
+                isNewLine = false;
             } else if (textObject.type === 'image') {
                 joinedObjects.push({ chr: '', textObject });
+                isNewLine = false;
+            } else if (textObject.type === 'cr') {
+                if (!isNewLine) {
+                    await this.drawTextLine();
+                    this.yPos += textOptions.fontSize * textOptions.lineHeight; // Move cursor one text line down
+                }
+                isNewLine = true;
+            } else if (textObject.type === 'br') {
+                await this.drawTextLine();
+                this.yPos += textOptions.fontSize * textOptions.lineHeight; // Move cursor one text line down
+                isNewLine = true;
             }
         }
 
         if (joinedObjects.length > 0) {
-            let result = await this.drawTextSliceBlock(
-                lineToDraw,
-                lineWidth,
-                joinedObjects,
-                {
-                    ...textOptions,
-                    bold: currentBold,
-                    italic: currentItalic,
-                },
-                yPos,
-            );
-            lineToDraw = result.lineToDraw;
-            lineWidth = result.lineWidth;
-            imagesToDraw = imagesToDraw.concat(result.imagesToDraw);
-            yPos = result.yPos;
+            let result = await this.drawJoinedObjects(joinedObjects, {
+                ...textOptions,
+                bold: currentBold,
+                italic: currentItalic,
+            });
         }
 
-        if (lineToDraw.length > 0) {
-            let result = await this.drawTextLine(lineToDraw, textOptions, yPos);
-            imagesToDraw = imagesToDraw.concat(result);
-            yPos += textOptions.fontSize * textOptions.lineHeight; // Move cursor one text line down
-        }
+        await this.drawTextLine();
 
-        return { imagesToDraw, yPos };
+        return this.imagesToDraw;
     }
 
-    async drawText(
-        node: HTMLElement,
-        color: string,
-        textOptions: TextOptions,
-        yPos: number,
-    ): Promise<{ textObjects: TextObject[]; imagesToDraw: ImageToDraw[]; yPos: number }> {
+    collectTextObjects(node: HTMLElement, color: string, textOptions: TextOptions): TextObject[] {
         let textObjects: TextObject[] = [];
-        let imagesToDraw: ImageToDraw[] = [];
         if (node.nodeType !== NodeType.ELEMENT_NODE) {
-            return { textObjects, imagesToDraw, yPos };
+            return textObjects;
         }
 
         for (const child of node.childNodes) {
@@ -372,11 +359,16 @@ export class CardGenerator {
                         newTextOptions.italic = true;
                     }
 
+                    if (element.tagName === 'br') {
+                        textObjects.push({
+                            type: 'br',
+                        });
+                    }
+
                     if (element.tagName === 'div') {
-                        // Draw text before this div
-                        let drawResult = await this.drawTextObjects(textObjects, textOptions, yPos);
-                        imagesToDraw = imagesToDraw.concat(drawResult.imagesToDraw);
-                        yPos = drawResult.yPos;
+                        textObjects.push({
+                            type: 'cr',
+                        });
 
                         if ('align' in element.attributes) {
                             newTextOptions.align = element.attributes['align'];
@@ -387,28 +379,20 @@ export class CardGenerator {
                                 newTextOptions.align = 'center';
                             }
                         }
-
-                        let result = await this.drawText(element, newColor, newTextOptions, yPos);
-                        textObjects = result.textObjects;
-                        yPos = result.yPos;
-                        imagesToDraw = imagesToDraw.concat(result.imagesToDraw);
-                    } else {
-                        let result = await this.drawText(element, newColor, newTextOptions, yPos);
-                        textObjects = textObjects.concat(result.textObjects);
-                        yPos = result.yPos;
-                        imagesToDraw = imagesToDraw.concat(result.imagesToDraw);
                     }
+
+                    let result = this.collectTextObjects(element, newColor, newTextOptions);
+                    textObjects = textObjects.concat(result);
                 }
             }
         }
 
-        if (node.tagName === 'div') {
-            let result = await this.drawTextObjects(textObjects, textOptions, yPos);
-            imagesToDraw = imagesToDraw.concat(result.imagesToDraw);
-            yPos = result.yPos;
-            return { textObjects: [], imagesToDraw, yPos };
-        }
-        return { textObjects, imagesToDraw, yPos };
+        return textObjects;
+    }
+
+    async drawText(node: HTMLElement, color: string, textOptions: TextOptions): Promise<ImageToDraw[]> {
+        let textObjects = this.collectTextObjects(node, color, textOptions);
+        return await this.drawTextObjects(textObjects, textOptions);
     }
 
     async *processCard(data: CardSetData, cardId: string, isBack: boolean): AsyncIterableIterator<ImageToDraw> {
@@ -478,7 +462,7 @@ export class CardGenerator {
                     bold: false,
                     italic: false,
                 };
-                let result = await this.drawText(parsedText as HTMLElement, placeholder.color, textOptions, 0);
+                let result = await this.drawText(parsedText as HTMLElement, placeholder.color, textOptions);
 
                 yield {
                     type: ImageType.BLOCK_START,
@@ -490,7 +474,7 @@ export class CardGenerator {
                     data: '',
                 };
 
-                for (const image of result.imagesToDraw) {
+                for (const image of result) {
                     yield image;
                 }
 
