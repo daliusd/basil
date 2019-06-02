@@ -16,7 +16,7 @@ const generatePdfForSample = async (username: string, password: string) => {
         const data: PdfJobData = {
             type: 'generatePdf',
             collectionType: 'cardsets',
-            collectionId: '668',
+            collectionId: '2',
             pageWidth: 210,
             pageHeight: 297,
             topBottomMargin: 15,

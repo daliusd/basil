@@ -132,6 +132,32 @@ export class PDFGenerator {
         );
         this.doc.rotate((imageToDraw.angle * 180) / Math.PI);
         this.doc.translate((-imageToDraw.width / 2) * PTPMM, (-imageToDraw.height / 2) * PTPMM);
+        if (imageToDraw.crop) {
+            this.doc.rect(0, 0, imageToDraw.width * PTPMM, imageToDraw.height * PTPMM).clip();
+        }
+    }
+
+    calculateImageDimensions(imageFieldInfo: ImageToDraw) {
+        let { fit, imageWidth, imageHeight } = imageFieldInfo;
+        imageWidth = imageWidth || imageFieldInfo.width;
+        imageHeight = imageHeight || imageFieldInfo.height;
+
+        let calculatedImageWidth, calculatedImageHeight;
+        if (!imageFieldInfo.fit || imageFieldInfo.fit === 'width') {
+            calculatedImageWidth = imageFieldInfo.width * PTPMM;
+            calculatedImageHeight = ((imageFieldInfo.width * imageHeight) / imageWidth) * PTPMM;
+        } else if (imageFieldInfo.fit === 'height') {
+            calculatedImageWidth = ((imageFieldInfo.height * imageWidth) / imageHeight) * PTPMM;
+            calculatedImageHeight = imageFieldInfo.height * PTPMM;
+        } else {
+            // strech
+            calculatedImageWidth = imageFieldInfo.width * PTPMM;
+            calculatedImageHeight = imageFieldInfo.height * PTPMM;
+        }
+
+        calculatedImageWidth *= imageFieldInfo.zoom || 1;
+        calculatedImageHeight *= imageFieldInfo.zoom || 1;
+        return { width: calculatedImageWidth, height: calculatedImageHeight };
     }
 
     async drawCard(
@@ -157,10 +183,15 @@ export class PDFGenerator {
         for await (const imageToDraw of cardGen.processCard(data, cardId, isBack)) {
             if (imageToDraw.type === ImageType.SVG) {
                 this.prepareImageToDrawSpace(imageToDraw);
+                if (imageToDraw.cx && imageToDraw.cy) {
+                    this.doc.translate(imageToDraw.cx * PTPMM, imageToDraw.cy * PTPMM);
+                }
+                let dim = this.calculateImageDimensions(imageToDraw);
+
                 const svg = buffer.Buffer.from(imageToDraw.data, 'base64').toString();
                 SVGtoPDF(this.doc, svg, 0, 0, {
-                    width: imageToDraw.width * PTPMM,
-                    height: imageToDraw.height * PTPMM,
+                    width: dim.width,
+                    height: dim.height,
                     preserveAspectRatio:
                         imageToDraw.fit === 'stretch'
                             ? 'none'
@@ -179,6 +210,10 @@ export class PDFGenerator {
                 this.doc.restore();
             } else if (imageToDraw.type === ImageType.IMAGE) {
                 this.prepareImageToDrawSpace(imageToDraw);
+                if (imageToDraw.cx && imageToDraw.cy) {
+                    this.doc.translate(imageToDraw.cx * PTPMM, imageToDraw.cy * PTPMM);
+                }
+                let dim = this.calculateImageDimensions(imageToDraw);
 
                 let url = imageToDraw.data;
                 if (!url.startsWith('http')) {
@@ -189,8 +224,8 @@ export class PDFGenerator {
 
                 if (resp.headers['content-type'] === 'image/svg+xml') {
                     SVGtoPDF(this.doc, buf.toString(), 0, 0, {
-                        width: imageToDraw.width * PTPMM,
-                        height: imageToDraw.height * PTPMM,
+                        width: dim.width,
+                        height: dim.height,
                         preserveAspectRatio:
                             imageToDraw.fit === 'stretch'
                                 ? 'none'
@@ -200,14 +235,8 @@ export class PDFGenerator {
                     });
                 } else {
                     this.doc.image(buf, 0, 0, {
-                        width:
-                            !imageToDraw.fit || imageToDraw.fit === 'width' || imageToDraw.fit === 'stretch'
-                                ? imageToDraw.width * PTPMM
-                                : undefined,
-                        height:
-                            imageToDraw.fit === 'height' || imageToDraw.fit === 'stretch'
-                                ? imageToDraw.height * PTPMM
-                                : undefined,
+                        width: dim.width,
+                        height: dim.height,
                     });
                 }
                 this.doc.restore();

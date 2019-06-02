@@ -9,7 +9,7 @@ export interface CardsCollection {
     [propName: string]: CardType;
 }
 
-export interface PlaceholderBase {
+export interface FieldBaseInfo {
     id: string;
     type: string;
     x: number;
@@ -22,8 +22,9 @@ export interface PlaceholderBase {
     isOnBack?: boolean;
 }
 
-export interface TextPlaceholderType extends PlaceholderBase {
+export interface TextFieldInfo extends FieldBaseInfo {
     type: 'text';
+    value: string;
     align: string;
     color: string;
     fontFamily: string;
@@ -32,41 +33,29 @@ export interface TextPlaceholderType extends PlaceholderBase {
     lineHeight?: number;
 }
 
-export interface ImagePlaceholderType extends PlaceholderBase {
-    id: string;
+export interface ImageFieldInfo extends FieldBaseInfo {
     type: 'image';
-    fit?: string;
-}
-
-export type PlaceholderType = TextPlaceholderType | ImagePlaceholderType;
-
-export interface PlaceholdersCollection {
-    [propName: string]: PlaceholderType;
-}
-
-export interface TextInfo {
-    value: string;
-}
-
-export interface PlaceholdersTextInfoCollection {
-    [propName: string]: TextInfo;
-}
-
-export interface PlaceholdersTextInfoByCardCollection {
-    [propName: string]: PlaceholdersTextInfoCollection;
-}
-
-export interface ImageInfo {
-    url: string;
+    url?: string;
+    global?: boolean;
     base64?: string;
+    color?: string;
+    imageWidth?: number;
+    imageHeight?: number;
+    fit?: string;
+    zoom?: number;
+    cx?: number;
+    cy?: number;
+    crop?: boolean;
 }
 
-export interface PlaceholdersImageInfoCollection {
-    [propName: string]: ImageInfo;
+export type FieldInfo = TextFieldInfo | ImageFieldInfo;
+
+export interface FieldInfoCollection {
+    [propName: string]: FieldInfo;
 }
 
-export interface PlaceholdersImageInfoByCardCollection {
-    [propName: string]: PlaceholdersImageInfoCollection;
+export interface FieldInfoByCardCollection {
+    [propName: string]: FieldInfoCollection;
 }
 
 export interface JobDataBase {
@@ -106,10 +95,8 @@ export interface CardSetData {
     isTwoSided: boolean;
     cardsAllIds: string[];
     cardsById: CardsCollection;
-    placeholders: PlaceholdersCollection;
-    placeholdersAllIds: string[];
-    texts: PlaceholdersTextInfoByCardCollection;
-    images: PlaceholdersImageInfoByCardCollection;
+    fieldsAllIds: string[];
+    fields: FieldInfoByCardCollection;
 }
 
 export enum ImageType {
@@ -131,4 +118,10 @@ export interface ImageToDraw {
     data: any;
     color?: string;
     scale?: number;
+    imageWidth?: number;
+    imageHeight?: number;
+    zoom?: number;
+    cx?: number;
+    cy?: number;
+    crop?: boolean;
 }

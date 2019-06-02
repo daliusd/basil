@@ -418,52 +418,47 @@ export class CardGenerator {
     }
 
     async *processCard(data: CardSetData, cardId: string, isBack: boolean): AsyncIterableIterator<ImageToDraw> {
-        const cardImages = data.images[cardId];
-        const cardTexts = data.texts[cardId];
-
-        for (const placeholderId of data.placeholdersAllIds) {
-            const placeholder = data.placeholders[placeholderId];
-            if ((placeholder.isOnBack || false) !== isBack) {
+        for (const fieldId of data.fieldsAllIds) {
+            const field = data.fields[cardId][fieldId];
+            if ((field.isOnBack || false) !== isBack) {
                 continue;
             }
 
-            if (placeholder.type === 'image' && cardImages) {
-                const imageInfo = cardImages[placeholderId];
-
-                if (imageInfo === undefined) continue;
-
+            if (field.type === 'image') {
                 let result = {
-                    x: placeholder.x,
-                    y: placeholder.y,
-                    angle: placeholder.angle,
-                    width: placeholder.width,
-                    height: placeholder.height,
-                    fit: placeholder.fit,
+                    x: field.x,
+                    y: field.y,
+                    angle: field.angle,
+                    width: field.width,
+                    height: field.height,
+                    fit: field.fit,
+                    imageWidth: field.imageWidth,
+                    imageHeight: field.imageHeight,
+                    zoom: field.zoom,
+                    cx: field.cx,
+                    cy: field.cy,
+                    crop: field.crop,
                 };
 
-                if (imageInfo.base64) {
+                if (field.base64) {
                     yield {
                         ...result,
                         type: ImageType.SVG,
-                        data: imageInfo.base64,
+                        data: field.base64,
                     };
-                } else if (imageInfo.url) {
+                } else if (field.url) {
                     try {
                         yield {
                             ...result,
                             type: ImageType.IMAGE,
-                            data: imageInfo.url,
+                            data: field.url,
                         };
                     } catch {
                         // TODO: handle error here
                     }
                 }
-            } else if (placeholder.type === 'text' && cardTexts) {
-                const textInfo = cardTexts[placeholderId];
-
-                if (textInfo === undefined) continue;
-
-                let text = `<div>${textInfo.value.replace(/<br>/g, '<br/>')}</div>`;
+            } else if (field.type === 'text') {
+                let text = `<div>${field.value.replace(/<br>/g, '<br/>')}</div>`;
                 let parsedText = parse('<div></div>');
                 try {
                     parsedText = parse(text);
@@ -471,28 +466,28 @@ export class CardGenerator {
                     // TODO: we should do something with errors like this one
                 }
 
-                let fontSize = placeholder.fontSize;
+                let fontSize = field.fontSize;
 
                 const textOptions: TextOptions = {
-                    fontFamily: placeholder.fontFamily,
-                    fontVariant: placeholder.fontVariant,
+                    fontFamily: field.fontFamily,
+                    fontVariant: field.fontVariant,
                     fontSize,
-                    lineHeight: placeholder.lineHeight || 1.27,
-                    align: placeholder.align,
-                    width: placeholder.width,
-                    height: placeholder.height,
+                    lineHeight: field.lineHeight || 1.27,
+                    align: field.align,
+                    width: field.width,
+                    height: field.height,
                     bold: false,
                     italic: false,
                 };
-                let result = await this.drawText(parsedText as HTMLElement, placeholder.color, textOptions);
+                let result = await this.drawText(parsedText as HTMLElement, field.color, textOptions);
 
                 yield {
                     type: ImageType.BLOCK_START,
-                    x: placeholder.x,
-                    y: placeholder.y,
-                    angle: placeholder.angle,
-                    width: placeholder.width,
-                    height: placeholder.height,
+                    x: field.x,
+                    y: field.y,
+                    angle: field.angle,
+                    width: field.width,
+                    height: field.height,
                     data: '',
                 };
 
@@ -502,11 +497,11 @@ export class CardGenerator {
 
                 yield {
                     type: ImageType.BLOCK_END,
-                    x: placeholder.x,
-                    y: placeholder.y,
-                    angle: placeholder.angle,
-                    width: placeholder.width,
-                    height: placeholder.height,
+                    x: field.x,
+                    y: field.y,
+                    angle: field.angle,
+                    width: field.width,
+                    height: field.height,
                     data: '',
                 };
             }
