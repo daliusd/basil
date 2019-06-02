@@ -15,3 +15,8 @@ Build final worker:
 ```
 npm run build
 ```
+
+Build debug worker:
+```
+npm run debug
+```

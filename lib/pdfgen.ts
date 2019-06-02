@@ -248,150 +248,105 @@ export class PDFGenerator {
         outStream: NodeJS.WritableStream,
         callback: () => void,
     ) => {
-        try {
-            let cardsets: CardSetData[] = [];
-            this.serverUrl = serverUrl;
+        let cardsets: CardSetData[] = [];
+        this.serverUrl = serverUrl;
 
-            // Get Card Sets
-            if (data.collectionType === 'games') {
-                let resp = await makeAuthRequest(
-                    `${this.serverUrl}/api/${data.collectionType}/${data.collectionId}`,
-                    data.accessToken,
-                );
-                let cardsetsList = resp.data.cardsets;
-                cardsetsList.sort((a: any, b: any) => (a.name < b.name ? -1 : 1));
+        // Get Card Sets
+        if (data.collectionType === 'games') {
+            let resp = await makeAuthRequest(
+                `${this.serverUrl}/api/${data.collectionType}/${data.collectionId}`,
+                data.accessToken,
+            );
+            let cardsetsList = resp.data.cardsets;
+            cardsetsList.sort((a: any, b: any) => (a.name < b.name ? -1 : 1));
 
-                for (const cardsetInfo of cardsetsList) {
-                    resp = await makeAuthRequest(`${this.serverUrl}/api/cardsets/${cardsetInfo.id}`, data.accessToken);
-                    let cardsetData: CardSetData = JSON.parse(resp.data.data);
-                    cardsets.push(cardsetData);
-                }
-            } else {
-                let resp = await makeAuthRequest(
-                    `${this.serverUrl}/api/${data.collectionType}/${data.collectionId}`,
-                    data.accessToken,
-                );
+            for (const cardsetInfo of cardsetsList) {
+                resp = await makeAuthRequest(`${this.serverUrl}/api/cardsets/${cardsetInfo.id}`, data.accessToken);
                 let cardsetData: CardSetData = JSON.parse(resp.data.data);
                 cardsets.push(cardsetData);
             }
+        } else {
+            let resp = await makeAuthRequest(
+                `${this.serverUrl}/api/${data.collectionType}/${data.collectionId}`,
+                data.accessToken,
+            );
+            let cardsetData: CardSetData = JSON.parse(resp.data.data);
+            cardsets.push(cardsetData);
+        }
 
-            // Prepare job data
-            this.doc = new PDFDocument({
-                size: [data.pageWidth * PTPMM, data.pageHeight * PTPMM],
-                info: {
-                    Title: 'Cards',
-                    Author: 'Card-a-mon',
-                },
-            });
+        // Prepare job data
+        this.doc = new PDFDocument({
+            size: [data.pageWidth * PTPMM, data.pageHeight * PTPMM],
+            info: {
+                Title: 'Cards',
+                Author: 'Card-a-mon',
+            },
+        });
 
-            const stream = this.doc.pipe(outStream);
+        const stream = this.doc.pipe(outStream);
 
-            const pageWidth = data.pageWidth * PTPMM;
-            const pageHeight = data.pageHeight * PTPMM;
-            const leftRightMargin = data.leftRightMargin * PTPMM;
-            const topBottomMargin = data.topBottomMargin * PTPMM;
-            const verticalSpace = data.verticalSpace * PTPMM;
-            const horizontalSpace = data.horizontalSpace * PTPMM;
+        const pageWidth = data.pageWidth * PTPMM;
+        const pageHeight = data.pageHeight * PTPMM;
+        const leftRightMargin = data.leftRightMargin * PTPMM;
+        const topBottomMargin = data.topBottomMargin * PTPMM;
+        const verticalSpace = data.verticalSpace * PTPMM;
+        const horizontalSpace = data.horizontalSpace * PTPMM;
 
-            const isTwoSided = cardsets.map(cs => cs.isTwoSided).reduce((a, b) => a || b, false);
+        const isTwoSided = cardsets.map(cs => cs.isTwoSided).reduce((a, b) => a || b, false);
 
-            let cardX = leftRightMargin;
-            let cardY = topBottomMargin;
-            let prevCardWidth = 0;
-            let prevCardHeight = 0;
-            let addNewPage = false;
-            let frontCards: {
-                cardX: number;
-                cardY: number;
-                cardWidth: number;
-                cardHeight: number;
-                cardId: string;
-                cardsetData: CardSetData;
-            }[] = [];
+        let cardX = leftRightMargin;
+        let cardY = topBottomMargin;
+        let prevCardWidth = 0;
+        let prevCardHeight = 0;
+        let addNewPage = false;
+        let frontCards: {
+            cardX: number;
+            cardY: number;
+            cardWidth: number;
+            cardHeight: number;
+            cardId: string;
+            cardsetData: CardSetData;
+        }[] = [];
 
-            let verticalGuillotineMarks: number[] = [];
-            let horizontalGuillotineMarks: number[] = [];
+        let verticalGuillotineMarks: number[] = [];
+        let horizontalGuillotineMarks: number[] = [];
 
-            for (const cardsetData of cardsets) {
-                if (data.topBottomMargin * 2 + cardsetData.height > data.pageHeight) {
-                    throw new Error(
-                        'Cards do not fit in the page (height and margins are larger then page height). Reduce margins or card size.',
-                    );
-                }
+        for (const cardsetData of cardsets) {
+            if (data.topBottomMargin * 2 + cardsetData.height > data.pageHeight) {
+                return Promise.reject(
+                    'Cards do not fit in the page (height and margins are larger then page height). Reduce margins or card size.',
+                );
+            }
 
-                if (data.leftRightMargin * 2 + cardsetData.width > data.pageWidth) {
-                    throw new Error(
-                        'Cards do not fit in the page (width and margins are larger then page width). Reduce margins or card size.',
-                    );
-                }
+            if (data.leftRightMargin * 2 + cardsetData.width > data.pageWidth) {
+                return Promise.reject(
+                    'Cards do not fit in the page (width and margins are larger then page width). Reduce margins or card size.',
+                );
+            }
 
-                const cardWidth = (cardsetData.width + (data.includeBleedingArea ? BLEED_WIDTH * 2 : 0)) * PTPMM;
-                const cardHeight = (cardsetData.height + (data.includeBleedingArea ? BLEED_WIDTH * 2 : 0)) * PTPMM;
+            const cardWidth = (cardsetData.width + (data.includeBleedingArea ? BLEED_WIDTH * 2 : 0)) * PTPMM;
+            const cardHeight = (cardsetData.height + (data.includeBleedingArea ? BLEED_WIDTH * 2 : 0)) * PTPMM;
 
-                if (
-                    prevCardHeight !== 0 &&
-                    prevCardWidth !== 0 &&
-                    (prevCardHeight !== cardHeight || prevCardWidth !== cardWidth)
-                ) {
-                    addNewPage = true;
-                    cardX = leftRightMargin;
-                    cardY = topBottomMargin;
-                }
+            if (
+                prevCardHeight !== 0 &&
+                prevCardWidth !== 0 &&
+                (prevCardHeight !== cardHeight || prevCardWidth !== cardWidth)
+            ) {
+                addNewPage = true;
+                cardX = leftRightMargin;
+                cardY = topBottomMargin;
+            }
 
-                prevCardHeight = cardHeight;
-                prevCardWidth = cardWidth;
+            prevCardHeight = cardHeight;
+            prevCardWidth = cardWidth;
 
-                for (const cardId of cardsetData.cardsAllIds) {
-                    const cardInfo = cardsetData.cardsById[cardId];
+            for (const cardId of cardsetData.cardsAllIds) {
+                const cardInfo = cardsetData.cardsById[cardId];
 
-                    for (let idx = 0; idx < cardInfo.count; idx++) {
-                        if (addNewPage) {
-                            if (isTwoSided) {
-                                if (data.cutMarksInMarginArea) {
-                                    this.drawCutMarksForGuillotine(
-                                        verticalGuillotineMarks,
-                                        horizontalGuillotineMarks,
-                                        pageWidth,
-                                        pageHeight,
-                                        leftRightMargin,
-                                        topBottomMargin,
-                                    );
-                                    verticalGuillotineMarks = [];
-                                    horizontalGuillotineMarks = [];
-                                }
-
-                                this.doc.addPage();
-                                for (const cardInfo of frontCards) {
-                                    let x = pageWidth - cardInfo.cardX - cardInfo.cardWidth;
-                                    let y = cardInfo.cardY;
-                                    await this.drawCard(
-                                        cardInfo.cardsetData,
-                                        data,
-                                        true,
-                                        cardInfo.cardId,
-                                        x,
-                                        y,
-                                        cardInfo.cardWidth,
-                                        cardInfo.cardHeight,
-                                    );
-                                    verticalGuillotineMarks.push(
-                                        x + (data.includeBleedingArea ? BLEED_WIDTH * PTPMM : 0),
-                                    );
-                                    verticalGuillotineMarks.push(
-                                        x + cardInfo.cardWidth - (data.includeBleedingArea ? BLEED_WIDTH * PTPMM : 0),
-                                    );
-                                    horizontalGuillotineMarks.push(
-                                        y + (data.includeBleedingArea ? BLEED_WIDTH * PTPMM : 0),
-                                    );
-                                    horizontalGuillotineMarks.push(
-                                        y + cardInfo.cardHeight - (data.includeBleedingArea ? BLEED_WIDTH * PTPMM : 0),
-                                    );
-                                }
-
-                                frontCards = [];
-                            }
-
-                            if (data.cutMarksInMarginArea && (!isTwoSided || !data.cutMarksOnFrontSideOnly)) {
+                for (let idx = 0; idx < cardInfo.count; idx++) {
+                    if (addNewPage) {
+                        if (isTwoSided) {
+                            if (data.cutMarksInMarginArea) {
                                 this.drawCutMarksForGuillotine(
                                     verticalGuillotineMarks,
                                     horizontalGuillotineMarks,
@@ -400,99 +355,138 @@ export class PDFGenerator {
                                     leftRightMargin,
                                     topBottomMargin,
                                 );
-
                                 verticalGuillotineMarks = [];
                                 horizontalGuillotineMarks = [];
                             }
 
                             this.doc.addPage();
-                            addNewPage = false;
-                        }
-                        frontCards.push({ cardX, cardY, cardWidth, cardHeight, cardId, cardsetData });
-                        await this.drawCard(cardsetData, data, false, cardId, cardX, cardY, cardWidth, cardHeight);
-
-                        verticalGuillotineMarks.push(cardX + (data.includeBleedingArea ? BLEED_WIDTH * PTPMM : 0));
-                        verticalGuillotineMarks.push(
-                            cardX + cardWidth - (data.includeBleedingArea ? BLEED_WIDTH * PTPMM : 0),
-                        );
-                        horizontalGuillotineMarks.push(cardY + (data.includeBleedingArea ? BLEED_WIDTH * PTPMM : 0));
-                        horizontalGuillotineMarks.push(
-                            cardY + cardHeight - (data.includeBleedingArea ? BLEED_WIDTH * PTPMM : 0),
-                        );
-
-                        // Get next card position
-                        cardX += cardWidth + verticalSpace;
-                        if (cardX + cardWidth > pageWidth - leftRightMargin) {
-                            cardX = leftRightMargin;
-                            cardY += cardHeight + horizontalSpace;
-                            if (cardY + cardHeight > pageHeight - topBottomMargin) {
-                                cardY = topBottomMargin;
-                                addNewPage = true;
+                            for (const cardInfo of frontCards) {
+                                let x = pageWidth - cardInfo.cardX - cardInfo.cardWidth;
+                                let y = cardInfo.cardY;
+                                await this.drawCard(
+                                    cardInfo.cardsetData,
+                                    data,
+                                    true,
+                                    cardInfo.cardId,
+                                    x,
+                                    y,
+                                    cardInfo.cardWidth,
+                                    cardInfo.cardHeight,
+                                );
+                                verticalGuillotineMarks.push(x + (data.includeBleedingArea ? BLEED_WIDTH * PTPMM : 0));
+                                verticalGuillotineMarks.push(
+                                    x + cardInfo.cardWidth - (data.includeBleedingArea ? BLEED_WIDTH * PTPMM : 0),
+                                );
+                                horizontalGuillotineMarks.push(
+                                    y + (data.includeBleedingArea ? BLEED_WIDTH * PTPMM : 0),
+                                );
+                                horizontalGuillotineMarks.push(
+                                    y + cardInfo.cardHeight - (data.includeBleedingArea ? BLEED_WIDTH * PTPMM : 0),
+                                );
                             }
+
+                            frontCards = [];
+                        }
+
+                        if (data.cutMarksInMarginArea && (!isTwoSided || !data.cutMarksOnFrontSideOnly)) {
+                            this.drawCutMarksForGuillotine(
+                                verticalGuillotineMarks,
+                                horizontalGuillotineMarks,
+                                pageWidth,
+                                pageHeight,
+                                leftRightMargin,
+                                topBottomMargin,
+                            );
+
+                            verticalGuillotineMarks = [];
+                            horizontalGuillotineMarks = [];
+                        }
+
+                        this.doc.addPage();
+                        addNewPage = false;
+                    }
+                    frontCards.push({ cardX, cardY, cardWidth, cardHeight, cardId, cardsetData });
+                    await this.drawCard(cardsetData, data, false, cardId, cardX, cardY, cardWidth, cardHeight);
+
+                    verticalGuillotineMarks.push(cardX + (data.includeBleedingArea ? BLEED_WIDTH * PTPMM : 0));
+                    verticalGuillotineMarks.push(
+                        cardX + cardWidth - (data.includeBleedingArea ? BLEED_WIDTH * PTPMM : 0),
+                    );
+                    horizontalGuillotineMarks.push(cardY + (data.includeBleedingArea ? BLEED_WIDTH * PTPMM : 0));
+                    horizontalGuillotineMarks.push(
+                        cardY + cardHeight - (data.includeBleedingArea ? BLEED_WIDTH * PTPMM : 0),
+                    );
+
+                    // Get next card position
+                    cardX += cardWidth + verticalSpace;
+                    if (cardX + cardWidth > pageWidth - leftRightMargin) {
+                        cardX = leftRightMargin;
+                        cardY += cardHeight + horizontalSpace;
+                        if (cardY + cardHeight > pageHeight - topBottomMargin) {
+                            cardY = topBottomMargin;
+                            addNewPage = true;
                         }
                     }
                 }
             }
+        }
 
-            if (isTwoSided && frontCards.length > 0) {
-                if (data.cutMarksInMarginArea && !data.cutMarksOnFrontSideOnly) {
-                    this.drawCutMarksForGuillotine(
-                        verticalGuillotineMarks,
-                        horizontalGuillotineMarks,
-                        pageWidth,
-                        pageHeight,
-                        leftRightMargin,
-                        topBottomMargin,
-                    );
+        if (isTwoSided && frontCards.length > 0) {
+            if (data.cutMarksInMarginArea && !data.cutMarksOnFrontSideOnly) {
+                this.drawCutMarksForGuillotine(
+                    verticalGuillotineMarks,
+                    horizontalGuillotineMarks,
+                    pageWidth,
+                    pageHeight,
+                    leftRightMargin,
+                    topBottomMargin,
+                );
 
-                    verticalGuillotineMarks = [];
-                    horizontalGuillotineMarks = [];
-                }
-
-                this.doc.addPage();
-                for (const cardInfo of frontCards) {
-                    let x = pageWidth - cardInfo.cardX - cardInfo.cardWidth;
-                    let y = cardInfo.cardY;
-                    await this.drawCard(
-                        cardInfo.cardsetData,
-                        data,
-                        true,
-                        cardInfo.cardId,
-                        x,
-                        y,
-                        cardInfo.cardWidth,
-                        cardInfo.cardHeight,
-                    );
-
-                    verticalGuillotineMarks.push(x + (data.includeBleedingArea ? BLEED_WIDTH * PTPMM : 0));
-                    verticalGuillotineMarks.push(
-                        x + cardInfo.cardWidth - (data.includeBleedingArea ? BLEED_WIDTH * PTPMM : 0),
-                    );
-                    horizontalGuillotineMarks.push(y + (data.includeBleedingArea ? BLEED_WIDTH * PTPMM : 0));
-                    horizontalGuillotineMarks.push(
-                        y + cardInfo.cardHeight - (data.includeBleedingArea ? BLEED_WIDTH * PTPMM : 0),
-                    );
-                }
-
-                if (data.cutMarksInMarginArea && (!isTwoSided || !data.cutMarksOnFrontSideOnly)) {
-                    this.drawCutMarksForGuillotine(
-                        verticalGuillotineMarks,
-                        horizontalGuillotineMarks,
-                        pageWidth,
-                        pageHeight,
-                        leftRightMargin,
-                        topBottomMargin,
-                    );
-
-                    verticalGuillotineMarks = [];
-                    horizontalGuillotineMarks = [];
-                }
+                verticalGuillotineMarks = [];
+                horizontalGuillotineMarks = [];
             }
 
-            this.doc.end();
-            stream.on('finish', callback);
-        } catch (error) {
-            throw error;
+            this.doc.addPage();
+            for (const cardInfo of frontCards) {
+                let x = pageWidth - cardInfo.cardX - cardInfo.cardWidth;
+                let y = cardInfo.cardY;
+                await this.drawCard(
+                    cardInfo.cardsetData,
+                    data,
+                    true,
+                    cardInfo.cardId,
+                    x,
+                    y,
+                    cardInfo.cardWidth,
+                    cardInfo.cardHeight,
+                );
+
+                verticalGuillotineMarks.push(x + (data.includeBleedingArea ? BLEED_WIDTH * PTPMM : 0));
+                verticalGuillotineMarks.push(
+                    x + cardInfo.cardWidth - (data.includeBleedingArea ? BLEED_WIDTH * PTPMM : 0),
+                );
+                horizontalGuillotineMarks.push(y + (data.includeBleedingArea ? BLEED_WIDTH * PTPMM : 0));
+                horizontalGuillotineMarks.push(
+                    y + cardInfo.cardHeight - (data.includeBleedingArea ? BLEED_WIDTH * PTPMM : 0),
+                );
+            }
+
+            if (data.cutMarksInMarginArea && (!isTwoSided || !data.cutMarksOnFrontSideOnly)) {
+                this.drawCutMarksForGuillotine(
+                    verticalGuillotineMarks,
+                    horizontalGuillotineMarks,
+                    pageWidth,
+                    pageHeight,
+                    leftRightMargin,
+                    topBottomMargin,
+                );
+
+                verticalGuillotineMarks = [];
+                horizontalGuillotineMarks = [];
+            }
         }
+
+        this.doc.end();
+        stream.on('finish', callback);
     };
 }
