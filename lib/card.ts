@@ -180,6 +180,8 @@ export class CardGenerator {
                     angle: 0,
                     width: textOptions.fontSize * tlg.glyph.ratio,
                     height: textOptions.fontSize,
+                    imageWidth: textOptions.fontSize * tlg.glyph.ratio,
+                    imageHeight: textOptions.fontSize,
                     type: ImageType.IMAGE,
                     data: tlg.glyph.url,
                 });

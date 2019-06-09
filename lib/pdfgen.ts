@@ -139,8 +139,8 @@ export class PDFGenerator {
 
     calculateImageDimensions(imageFieldInfo: ImageToDraw) {
         let { fit, imageWidth, imageHeight } = imageFieldInfo;
-        imageWidth = imageWidth || imageFieldInfo.width;
-        imageHeight = imageHeight || imageFieldInfo.height;
+        imageWidth = imageWidth || 1;
+        imageHeight = imageHeight || 1;
 
         let calculatedImageWidth, calculatedImageHeight;
         if (!imageFieldInfo.fit || imageFieldInfo.fit === 'width') {
@@ -183,7 +183,7 @@ export class PDFGenerator {
         for await (const imageToDraw of cardGen.processCard(data, cardId, isBack)) {
             if (imageToDraw.type === ImageType.SVG) {
                 this.prepareImageToDrawSpace(imageToDraw);
-                if (imageToDraw.cx && imageToDraw.cy) {
+                if (imageToDraw.cx !== undefined && imageToDraw.cy !== undefined) {
                     this.doc.translate(imageToDraw.cx * PTPMM, imageToDraw.cy * PTPMM);
                 }
                 let dim = this.calculateImageDimensions(imageToDraw);
