@@ -210,7 +210,7 @@ export class PDFGenerator {
                 this.doc.restore();
             } else if (imageToDraw.type === ImageType.IMAGE) {
                 this.prepareImageToDrawSpace(imageToDraw);
-                if (imageToDraw.cx && imageToDraw.cy) {
+                if (imageToDraw.cx !== undefined && imageToDraw.cy !== undefined) {
                     this.doc.translate(imageToDraw.cx * PTPMM, imageToDraw.cy * PTPMM);
                 }
                 let dim = this.calculateImageDimensions(imageToDraw);
