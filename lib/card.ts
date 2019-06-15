@@ -420,6 +420,10 @@ export class CardGenerator {
     }
 
     async *processCard(data: CardSetData, cardId: string, isBack: boolean): AsyncIterableIterator<ImageToDraw> {
+        if (!('fieldsAllIds' in data)) {
+            return;
+        }
+
         for (const fieldId of data.fieldsAllIds) {
             const field = data.fields[cardId][fieldId];
             if ((field.isOnBack || false) !== isBack) {
