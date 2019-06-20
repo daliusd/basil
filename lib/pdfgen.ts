@@ -196,7 +196,7 @@ export class PDFGenerator {
                         imageToDraw.fit === 'stretch'
                             ? 'none'
                             : imageToDraw.fit === 'height'
-                            ? 'xMinYMid slice'
+                            ? 'xMinYMid meet'
                             : 'xMidYMin meet',
                 });
                 this.doc.restore();
@@ -230,7 +230,7 @@ export class PDFGenerator {
                             imageToDraw.fit === 'stretch'
                                 ? 'none'
                                 : imageToDraw.fit === 'height'
-                                ? 'xMinYMid slice'
+                                ? 'xMinYMid meet'
                                 : 'xMidYMin meet',
                     });
                 } else {
