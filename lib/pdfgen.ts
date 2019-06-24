@@ -460,21 +460,21 @@ export class PDFGenerator {
             }
         }
 
+        if (data.cutMarksInMarginArea) {
+            this.drawCutMarksForGuillotine(
+                verticalGuillotineMarks,
+                horizontalGuillotineMarks,
+                pageWidth,
+                pageHeight,
+                leftRightMargin,
+                topBottomMargin,
+            );
+
+            verticalGuillotineMarks = [];
+            horizontalGuillotineMarks = [];
+        }
+
         if (isTwoSided && frontCards.length > 0) {
-            if (data.cutMarksInMarginArea && !data.cutMarksOnFrontSideOnly) {
-                this.drawCutMarksForGuillotine(
-                    verticalGuillotineMarks,
-                    horizontalGuillotineMarks,
-                    pageWidth,
-                    pageHeight,
-                    leftRightMargin,
-                    topBottomMargin,
-                );
-
-                verticalGuillotineMarks = [];
-                horizontalGuillotineMarks = [];
-            }
-
             this.doc.addPage();
             for (const cardInfo of frontCards) {
                 let x = pageWidth - cardInfo.cardX - cardInfo.cardWidth;
