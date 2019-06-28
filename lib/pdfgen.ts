@@ -402,16 +402,21 @@ export class PDFGenerator {
                                     cardInfo.cardWidth,
                                     cardInfo.cardHeight,
                                 );
-                                verticalGuillotineMarks.push(x + (data.includeBleedingArea ? BLEED_WIDTH * PTPMM : 0));
-                                verticalGuillotineMarks.push(
-                                    x + cardInfo.cardWidth - (data.includeBleedingArea ? BLEED_WIDTH * PTPMM : 0),
-                                );
-                                horizontalGuillotineMarks.push(
-                                    y + (data.includeBleedingArea ? BLEED_WIDTH * PTPMM : 0),
-                                );
-                                horizontalGuillotineMarks.push(
-                                    y + cardInfo.cardHeight - (data.includeBleedingArea ? BLEED_WIDTH * PTPMM : 0),
-                                );
+
+                                if (data.cutMarksInMarginArea && !data.cutMarksOnFrontSideOnly) {
+                                    verticalGuillotineMarks.push(
+                                        x + (data.includeBleedingArea ? BLEED_WIDTH * PTPMM : 0),
+                                    );
+                                    verticalGuillotineMarks.push(
+                                        x + cardInfo.cardWidth - (data.includeBleedingArea ? BLEED_WIDTH * PTPMM : 0),
+                                    );
+                                    horizontalGuillotineMarks.push(
+                                        y + (data.includeBleedingArea ? BLEED_WIDTH * PTPMM : 0),
+                                    );
+                                    horizontalGuillotineMarks.push(
+                                        y + cardInfo.cardHeight - (data.includeBleedingArea ? BLEED_WIDTH * PTPMM : 0),
+                                    );
+                                }
                             }
 
                             frontCards = [];
