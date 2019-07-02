@@ -369,7 +369,8 @@ export class PDFGenerator {
             prevCardHeight = cardHeight;
             prevCardWidth = cardWidth;
 
-            for (const cardId of cardsetData.cardsAllIds) {
+            let cardsAllIds = cardsetData.cardsAllIds || [];
+            for (const cardId of cardsAllIds) {
                 const cardInfo = cardsetData.cardsById[cardId];
 
                 for (let idx = 0; idx < cardInfo.count; idx++) {
