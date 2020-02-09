@@ -1,7 +1,7 @@
 const fontkit = require('fontkit');
 const { SVGPathData } = require('svg-pathdata');
 const buffer = require('buffer');
-import { parse, HTMLElement, NodeType } from 'node-html-parser';
+import { parse, HTMLElement } from 'node-html-parser';
 
 const webFonts = require('./webfonts').webFonts;
 import { CardSetData, ImageToDraw, ImageType } from './types';
@@ -347,12 +347,12 @@ export class CardGenerator {
 
     collectTextObjects(node: HTMLElement, color: string, textOptions: TextOptions): TextObject[] {
         let textObjects: TextObject[] = [];
-        if (node.nodeType !== NodeType.ELEMENT_NODE) {
+        if (node.nodeType !== 1 /* ELEMENT_NODE */) {
             return textObjects;
         }
 
         for (const child of node.childNodes) {
-            if (child.nodeType === NodeType.TEXT_NODE) {
+            if (child.nodeType === 3 /* TEXT_NODE */) {
                 textObjects.push({
                     type: 'slice',
                     text: child.text,
@@ -360,7 +360,7 @@ export class CardGenerator {
                     bold: textOptions.bold,
                     italic: textOptions.italic,
                 });
-            } else if (child.nodeType === NodeType.ELEMENT_NODE) {
+            } else if (child.nodeType === 1 /* ELEMENT_NODE */) {
                 const element = child as HTMLElement;
 
                 if (element.tagName === 'img') {
