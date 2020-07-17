@@ -215,30 +215,32 @@ export class PDFGenerator {
                 }
                 let dim = this.calculateImageDimensions(imageToDraw);
 
-                let url = imageToDraw.data;
-                if (!url.startsWith('http')) {
-                    url = this.serverUrl + url;
-                }
-                let resp = await makeRequest(url);
-                const buf = buffer.Buffer.from(resp.data);
+                try {
+                    let url = imageToDraw.data;
+                    if (!url.startsWith('http')) {
+                        url = this.serverUrl + url;
+                    }
+                    let resp = await makeRequest(url);
+                    const buf = buffer.Buffer.from(resp.data);
 
-                if (resp.headers['content-type'] === 'image/svg+xml') {
-                    SVGtoPDF(this.doc, buf.toString(), 0, 0, {
-                        width: dim.width,
-                        height: dim.height,
-                        preserveAspectRatio:
-                            imageToDraw.fit === 'stretch'
-                                ? 'none'
-                                : imageToDraw.fit === 'height'
-                                ? 'xMinYMid meet'
-                                : 'xMidYMin meet',
-                    });
-                } else {
-                    this.doc.image(buf, 0, 0, {
-                        width: dim.width,
-                        height: dim.height,
-                    });
-                }
+                    if (resp.headers['content-type'] === 'image/svg+xml') {
+                        SVGtoPDF(this.doc, buf.toString(), 0, 0, {
+                            width: dim.width,
+                            height: dim.height,
+                            preserveAspectRatio:
+                                imageToDraw.fit === 'stretch'
+                                    ? 'none'
+                                    : imageToDraw.fit === 'height'
+                                    ? 'xMinYMid meet'
+                                    : 'xMidYMin meet',
+                        });
+                    } else {
+                        this.doc.image(buf, 0, 0, {
+                            width: dim.width,
+                            height: dim.height,
+                        });
+                    }
+                } catch {}
                 this.doc.restore();
             } else if (imageToDraw.type === ImageType.BLOCK_START) {
                 this.prepareImageToDrawSpace(imageToDraw);
